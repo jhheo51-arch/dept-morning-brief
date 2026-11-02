@@ -9,5 +9,6 @@
  "sales_status": "평소",
  "sales_yoy": 1.3,
  "promo_warn": 3,
- "touch_flags": 1
+ "touch_flags": 1,
+ "tasks_overdue": 1
 }

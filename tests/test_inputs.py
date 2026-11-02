@@ -392,3 +392,38 @@ def test_last_day_copy_only_when_a_promo_ends(tmp_path):
         assert ("마지막 날" in c["copy_a"]) == (c["date"] in ends)
     for x in b["calendar"]["days"]:
         assert x["ending"] == [i["name"] for i in b["promos"]["items"] if i["end"] == x["date"]]
+
+
+# 업무 목록
+def test_tasks_due_order_and_done_words(tmp_path):
+    write_csv(tmp_path, "tasks", ["업무", "기한", "상태", "담당"],
+              [["문자 문구 확정", "2026-11-07", "", "채널"], ["VMD 요청서", "11/04", "진행 중", "VMD"],
+               ["알릴 길 정하기", "2026-11-05", "", ""], ["결과 보고", "2026-11-01", "완료(11/03)", "식품팀"]])
+    t = judge.rule_tasks(I.read_table("tasks", tmp_path, TODAY), TODAY)
+    assert [i["phase"] for i in t["items"]] == ["기한 지남 1일", "오늘 마감", "D-2"]
+    assert t["status"] == "확인 필요" and t["overdue"] == 1 and t["due_today"] == 1 and t["soon"] == 1
+    assert [c["name"] for c in t["closed_now"]] == ["결과 보고"]
+    assert write.top_three({"tasks": t})[0] == "업무 VMD 요청서: 기한 지남 1일 외 1건"
+    write_csv(tmp_path, "tasks", ["업무", "기한"], [["", "2026-11-07"]])
+    with pytest.raises(I.InputError, match="2행 '업무'"):
+        judge.rule_tasks(I.read_table("tasks", tmp_path, TODAY), TODAY)
+
+
+def test_task_archive_keeps_done_after_row_is_deleted(tmp_path):
+    real_mode(tmp_path)
+    inp = tmp_path / "inputs"
+    write_csv(inp, "tasks", ["업무", "기한", "상태"], [["결과 보고", "2026-11-01", "완료"], ["문구 확정", "2026-11-07", ""]])
+    b = main.run(NOW, tmp_path, None, lambda d: {})
+    assert [a["name"] for a in b["task_archive"]] == ["결과 보고"] and b["task_archive"][0]["done_on"] == "2026-11-05"
+    assert b["tasks"]["status"] == "평소" and "## 업무" in (tmp_path / "output" / "site" / "brief.md").read_text(
+        encoding="utf-8")
+    # 다음 날 완료 행을 지워도 보관에 남고, 완료일은 처음 본 날 그대로
+    write_csv(inp, "tasks", ["업무", "기한", "상태"], [["문구 확정", "2026-11-07", "완료"]])
+    b = main.run(NOW + dt.timedelta(days=1), tmp_path, None, lambda d: {})
+    assert [(a["name"], a["done_on"]) for a in b["task_archive"]] == [("문구 확정", "2026-11-06"),
+                                                                     ("결과 보고", "2026-11-05")]
+    assert b["tasks"]["items"] == []
+    # 상태를 다시 비우면 보관에서 빠진다
+    write_csv(inp, "tasks", ["업무", "기한", "상태"], [["문구 확정", "2026-11-07", ""]])
+    b = main.run(NOW + dt.timedelta(days=1), tmp_path, None, lambda d: {})
+    assert [a["name"] for a in b["task_archive"]] == ["결과 보고"]

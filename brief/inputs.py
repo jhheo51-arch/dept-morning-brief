@@ -16,6 +16,7 @@ SCHEMAS = {
     "pilot_weekly": (["주차", "그룹", "회원수", "방문 횟수"], ["수신 거부"]),
     "field_log": (["날짜", "접점"], ["결과", "메모"]),
     "touchpoint_daily": (["날짜", "접점", "지표", "값"], ["메모"]),
+    "tasks": (["업무", "기한"], ["상태", "담당", "관련 행사", "완료일", "메모"]),
 }
 HELP = {
     "sales": {"날짜": "매출일(2026-11-01)", "구분": "전체, 식품, 패션처럼 보고 싶은 단위. '전체'가 없으면 나머지를 더함",
@@ -32,6 +33,10 @@ HELP = {
     "touchpoint_daily": {"날짜": "집계한 날", "접점": "문화센터, 우수고객 라운지, 고객 상담실 등",
                          "지표": "수강 신청, 이용 수, 문의 앱 혜택처럼 접점 안에서 같은 이름으로", "값": "그날 숫자(건, 명)",
                          "메모": "자유롭게"},
+    "tasks": {"업무": "할 일 한 줄(예: 주말 행사 문자 문구 확정)", "기한": "끝낼 날(2026-11-07)",
+              "상태": "비우면 할 일. '완료'를 적으면 보관 목록으로 옮김", "담당": "담당자나 협력 부서",
+              "관련 행사": "promotions 파일의 행사명", "완료일": "끝낸 날, 비우면 처음 완료로 본 날",
+              "메모": "자유롭게"},
 }
 SKIP_WORDS = {"합계", "소계", "총계", "계", "누계"}  # 사내 내려받기 파일의 합계 줄
 SKIP_END = ("합계", "소계", "총계")  # '식품 소계'처럼 끝에 붙는 경우
@@ -244,6 +249,16 @@ def _one(s, near, row, col):
     if not m:
         raise ValueError
     return _near_year(int(m.group(1)), int(m.group(2)), near)
+
+
+def to_day(v, row, col, today):
+    """업무 기한처럼 연도를 빼고 적기 쉬운 날짜. '11/07', '11월 7일'은 오늘과 가까운 해로 읽는다."""
+    if isinstance(v, (dt.date, dt.datetime)):
+        return to_date(v, row, col)
+    try:
+        return _one(_strip_tail(str(v or "").strip()), today, row, col)
+    except ValueError:
+        raise InputError(f"{where(row)} '{col}' 값 '{v}'을 날짜로 읽지 못했습니다(예: 2026-11-07 또는 11/07)") from None
 
 
 def to_period(v, row, col, today):

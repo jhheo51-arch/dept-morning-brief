@@ -15,10 +15,10 @@ from .collect import KST
 ROOT = C.ROOT
 BLOCKS = {"review": "리뷰 수집", "calendar": "날씨 예보 수집", "pilot": "시범 계산", "field": "현장 목록 판단",
           "sales": "매출 파일 읽기", "promos": "행사 파일 읽기", "promo_results": "행사 성과 계산",
-          "touch": "접점 숫자 파일 읽기", "weekly": "주간 정리",
+          "touch": "접점 숫자 파일 읽기", "tasks": "업무 목록 읽기", "weekly": "주간 정리",
          "consult": "협의 초안", "plan": "기획 초안"}
 FILES = {"sales": "sales", "promos": "promotions", "pilot": "pilot_weekly", "field": "field_log",
-         "touch": "touchpoint_daily"}
+         "touch": "touchpoint_daily", "tasks": "tasks"}
 
 
 class LeakError(RuntimeError):
@@ -82,9 +82,10 @@ def run(now=None, root=ROOT, review_fetch=None, weather_fetch=None, summarizer=N
             empty.append(f"{FILES[key]}.xlsx")
         return rows
 
-    # 매출 현황, 행사 점검, 접점 숫자
+    # 매출 현황, 행사 점검, 접점 숫자, 업무 목록
     ok_rows = {}
-    for key, rule in (("sales", judge.rule_sales), ("promos", judge.rule_promos), ("touch", judge.rule_touch)):
+    for key, rule in (("sales", judge.rule_sales), ("promos", judge.rule_promos), ("touch", judge.rule_touch),
+                      ("tasks", judge.rule_tasks)):
         try:
             rows = table(key)
             out[key] = rule(rows, today) if rows else None
@@ -100,6 +101,14 @@ def run(now=None, root=ROOT, review_fetch=None, weather_fetch=None, summarizer=N
             out["promo_results"] = judge.rule_promo_results(ok_rows["promos"], ok_rows["sales"], today)
         except I.InputError as e:
             out["promo_results"] = fallback("promo_results", e)
+
+    # 완료 업무는 보관 파일에 쌓는다. 엑셀에서 완료 행을 지워도 보관 목록에 남는다
+    archive_path = data / "tasks_archive.json"
+    archive = _load(archive_path).get("items", [])
+    if out["tasks"] and not out["tasks"].get("stale"):
+        archive = judge.merge_task_archive(archive, out["tasks"], today)
+        archive_path.write_text(json.dumps({"note": "상태에 완료를 적은 업무. 업무와 기한이 같으면 같은 업무로 봄",
+                                            "items": archive}, ensure_ascii=False, indent=1), encoding="utf-8")
 
     # 4.1
     if C.APP_ID and not C.OFFLINE:
@@ -146,7 +155,8 @@ def run(now=None, root=ROOT, review_fetch=None, weather_fetch=None, summarizer=N
         log = None
         out["field"] = judge.rule_field(out["review"], out["calendar"], touch=out["touch"])
 
-    judgment = {k: v for k, v in out.items() if v}
+    # 업무 목록은 담당자 메모가 들어 있어 요약 API에 보내지 않는다
+    judgment = {k: v for k, v in out.items() if v and k != "tasks"}
     slim = {k: ({kk: vv for kk, vv in v.items() if kk not in ("series30", "daily60", "week")} if v else v)
             for k, v in judgment.items()}
     if summarizer is None:
@@ -169,6 +179,7 @@ def run(now=None, root=ROOT, review_fetch=None, weather_fetch=None, summarizer=N
         "review_on": bool(C.APP_ID),
         "last_ok": last_ok,
         **out,
+        "task_archive": archive,
     }
     try:
         brief["weekly"] = judge.week_summary(today, out, log)
@@ -196,7 +207,8 @@ def run(now=None, root=ROOT, review_fetch=None, weather_fetch=None, summarizer=N
             "sales_status": (out["sales"] or {}).get("status"),
             "sales_yoy": ((out["sales"] or {}).get("total") or {}).get("yoy_pct"),
             "promo_warn": (out["promos"] or {}).get("warn_count"),
-            "touch_flags": len((out["touch"] or {}).get("flagged", [])) if out["touch"] else None}
+            "touch_flags": len((out["touch"] or {}).get("flagged", [])) if out["touch"] else None,
+            "tasks_overdue": (out["tasks"] or {}).get("overdue")}
     (data / "history" / f"{brief['date']}.json").write_text(
         json.dumps(hist, ensure_ascii=False, indent=1), encoding="utf-8")
     if out["review"] and not out["review"].get("stale"):

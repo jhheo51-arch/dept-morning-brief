@@ -33,6 +33,11 @@ def top_three(out):
     sales, promos, review, calendar, pilot, field, touch, res = (out.get(k) for k in (
         "sales", "promos", "review", "calendar", "pilot", "field", "touch", "promo_results"))
     urgent, usual = [], []
+    tasks = out.get("tasks")
+    if tasks and tasks["status"] == "확인 필요":
+        hot = [i for i in tasks["items"] if i["warn"]]
+        more = f" 외 {len(hot) - 1}건" if len(hot) > 1 else ""
+        urgent.append(f"업무 {hot[0]['name']}: {hot[0]['phase']}{more}")
     if sales:
         line = f"매출 {sales['status']}: {_sales_line(sales)}"
         if sales["parts_flagged"]:
@@ -81,6 +86,9 @@ def template_summary(out):
         s.append(f"행사 성과는 {sum(i['flag'] for i in res['items'])}건이 앞 같은 요일 기간보다 낮습니다.")
     if touch and touch["flagged"]:
         s.append(f"접점 숫자 {len(touch['flagged'])}건이 평소와 다릅니다.")
+    tasks = out.get("tasks")
+    if tasks and tasks["items"]:
+        s.append(f"열린 업무 {len(tasks['items'])}건 중 기한 지남 {tasks['overdue']}건, 오늘 마감 {tasks['due_today']}건입니다.")
     if review:
         t = review.get("totals30")
         s.append(f"앱 리뷰는 {review['status']}입니다. 새 1~2점은 {review['low_new']}건, 막힘은 "
@@ -142,6 +150,10 @@ def brief_markdown(b):
     lines = [f"# 아침 점검 {b['date']}", "", "## 오늘 볼 것"]
     lines += [f"{i}. {t}" for i, t in enumerate(b["top3"], 1)]
     lines += ["", "## 요약", b["summary"], ""]
+    t = b.get("tasks")
+    if t and t["items"]:
+        lines += ["## 업무"] + [f"- {i['phase']} | {i['name']}" + (f" ({i['owner']})" if i["owner"] else "")
+                                for i in t["items"][:C.TASKS.get("max_rows", 10)]] + [""]
     if b["failures"]:
         lines += [f"실패: {', '.join(f['step'] for f in b['failures'])}. "
                   "실패한 블록은 마지막 성공 결과를 보여 줍니다.", ""]

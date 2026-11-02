@@ -82,6 +82,7 @@ def load(paths=None):
     g["TOUCH"] = cfg.get("touchpoint_daily", {})
     g["CONSULT"] = cfg.get("consult", {})
     g["PLAN"] = cfg.get("plan", {})
+    g["TASKS"] = cfg.get("tasks", {})
 
     p = cfg["pilot"]
     g["PILOT_START"] = p["start"] if isinstance(p["start"], dt.date) else dt.date.fromisoformat(p["start"])

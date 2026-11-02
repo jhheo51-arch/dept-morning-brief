@@ -182,6 +182,61 @@ def rule_promos(rows, today):
     }
 
 
+def rule_tasks(rows, today):
+    """업무 목록. 상태에 완료 단어가 있으면 보관으로 넘기고, 열린 업무는 기한 순으로 세운다."""
+    done = C.TASKS.get("done_words", ["완료"])
+    soon = C.TASKS.get("soon_days", 3)
+    items, closed = [], []
+    for r in rows:
+        name = str(r["업무"] or "").strip()
+        if not name:
+            raise I.InputError(f"{I.where(r)} '업무' 값이 비어 있습니다")
+        due = I.to_day(r["기한"], r, "기한", today)
+        state = str(r.get("상태") or "").strip()
+        base = {"name": name, "due": due.isoformat(), "state": state, "owner": str(r.get("담당") or "").strip(),
+                "promo": str(r.get("관련 행사") or "").strip(), "memo": str(r.get("메모") or "").strip()}
+        if any(w in state for w in done):
+            fin = I.to_day(r["완료일"], r, "완료일", today) if r.get("완료일") else None
+            closed.append(dict(base, done_on=fin.isoformat() if fin else None))
+            continue
+        left = (due - today).days
+        if left < 0:
+            phase, warn = f"기한 지남 {-left}일", True
+        elif left == 0:
+            phase, warn = "오늘 마감", True
+        else:
+            phase, warn = f"D-{left}", False
+        items.append(dict(base, phase=phase, left=left, warn=warn, soon=left <= soon))
+    items.sort(key=lambda x: (x["due"], x["name"]))
+    late = [i for i in items if i["left"] < 0]
+    return {
+        "rule": "업무 목록",
+        "items": items,
+        "closed_now": closed,
+        "overdue": len(late),
+        "due_today": sum(1 for i in items if i["left"] == 0),
+        "soon": sum(1 for i in items if 0 < i["left"] <= soon),
+        "status": "확인 필요" if any(i["warn"] for i in items) else "평소",
+        "rule_text": f"기한이 지났거나 오늘이면 확인 필요, {soon}일 안이면 앞에 표시, "
+                     f"상태에 {', '.join(done)} 이 있으면 보관",
+        "source": _src(rows[0]["_file"]) if rows else "업무 파일",
+    }
+
+
+def merge_task_archive(archive, tasks, today):
+    """완료 업무를 보관 목록에 쌓는다. 엑셀에서 행을 지워도 남고, 상태를 다시 비우면 보관에서 뺀다."""
+    keep = C.TASKS.get("archive_days", 90)
+    box = {(a["name"], a["due"]): a for a in archive}
+    for i in tasks["items"]:
+        box.pop((i["name"], i["due"]), None)
+    for c in tasks["closed_now"]:
+        old = box.get((c["name"], c["due"]), {})
+        box[(c["name"], c["due"])] = dict(c, done_on=c["done_on"] or old.get("done_on") or today.isoformat())
+    cut = (today - dt.timedelta(days=keep)).isoformat()
+    return sorted((a for a in box.values() if a["done_on"] >= cut), key=lambda a: (a["done_on"], a["name"]),
+                  reverse=True)
+
+
 def rule_promo_results(promo_rows, sales_rows, today):
     """시작한 행사의 기간 매출(어제까지)을 바로 앞 같은 요일 기간과 견준다. 매출 구분이 있으면 그 구분만 본다."""
     keep, low = C.PROMO.get("result_days", 14), C.PROMO.get("result_low_pct", -5)
