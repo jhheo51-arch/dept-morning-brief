@@ -46,6 +46,8 @@ def test_review_calm_and_high_scores_ignored():
     r = judge.rule_reviews(rows, NOW, SINCE)
     assert r["low_new"] == 1 and r["status"] == "평소"
     assert len(r["series30"]) == 30 and r["series30"][-1]["date"] == "2026-11-05"
+    assert r["totals30"]["low"] == sum(x["low"] for x in r["series30"]) and r["totals30"]["all"] == sum(x["all"] for x in r["series30"])
+    assert len(r["daily60"]) == 60 and r["totals_prev30"]["to"] == "2026-10-06"
 
 
 # 4.2
@@ -86,8 +88,11 @@ def fake_sim(lift, optout_sent, n=4000, weeks=10, seed=1):
 def test_pilot_before_start_and_check_days():
     assert judge.rule_pilot(dt.date(2026, 10, 12), fake_sim(0.03, 0.003))["decision"] == "집계 전"
     p = judge.rule_pilot(dt.date(2026, 11, 9), fake_sim(0.03, 0.003))
-    assert p["check_day"] and p["weeks_done"] == 4 and p["virtual"]
-    assert not judge.rule_pilot(dt.date(2026, 11, 10), fake_sim(0.03, 0.003))["check_day"]
+    assert p["check_day"] and p["weeks_done"] == 4 and p["virtual"] and p["week_label"] == "4주차 점검일"
+    q = judge.rule_pilot(dt.date(2026, 11, 10), fake_sim(0.03, 0.003))
+    assert not q["check_day"] and q["week_label"] == "4주 누적"
+    assert "4주 누적" in " ".join(q["reasons"])  # 화면 주차와 근거 문장이 같은 숫자
+    assert judge.rule_pilot(dt.date(2026, 12, 21), fake_sim(0.03, 0.003))["week_label"] == "10주차 점검일"
 
 
 def test_pilot_final_decisions():

@@ -25,7 +25,7 @@ def top_three(review, calendar, pilot, field):
             if t["pilots"] and t["channels"] else (_pilot_names(t["pilots"]) or "맞는 시범 없음")
         out.append(f"오늘({', '.join(t['situation'])}) {what}")
     if pilot and pilot.get("check_day"):
-        out.append(f"시범 {pilot['weeks_done']}주차 점검일: {pilot['decision']}(가상 데이터)")
+        out.append(f"시범 {pilot['week_label']}: {pilot['decision']}(가상 데이터)")
     elif field and field["items"]:
         i = field["items"][0]
         out.append(f"현장 {i['place']}: {i['check']}")
@@ -35,8 +35,11 @@ def top_three(review, calendar, pilot, field):
 def template_summary(review, calendar, pilot):
     s = []
     if review:
+        t = review.get("totals30")
         s.append(f"앱 리뷰는 {review['status']}입니다. 새 1~2점은 {review['low_new']}건, 막힘은 "
-                 f"{review['blocked_new']}건이고 지난 7일 합계는 {review['low_7d']}건입니다.")
+                 f"{review['blocked_new']}건이고 "
+                 + (f"최근 30일 1~2점은 {t['low']}건, 막힘은 {t['blocked']}건입니다." if t
+                    else f"지난 7일 합계는 {review['low_7d']}건입니다."))
     else:
         s.append("앱 리뷰는 수집하지 못해 판단을 건너뜁니다.")
     if calendar:
@@ -44,7 +47,8 @@ def template_summary(review, calendar, pilot):
         s.append(f"오늘은 {', '.join(t['situation'])}이라 "
                  + (f"{_pilot_names(t['pilots'])}에 맞춰 봅니다." if t["pilots"] else "따로 부를 시범이 없습니다."))
     if pilot:
-        s.append(f"가상 시범은 {pilot['week']}주차이고 판단은 {pilot['decision']}입니다.")
+        s.append(f"가상 시범은 {pilot['week_label']} 기준이고 판단은 {pilot['decision']}입니다."
+                 if pilot.get("weeks_done", 0) > 0 else "가상 시범은 아직 집계 전입니다.")
     return " ".join(s)
 
 

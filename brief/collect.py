@@ -24,7 +24,7 @@ def to_kst(at):
     return at.astimezone(KST) if at.tzinfo is None else at.astimezone(KST)
 
 
-def fetch_reviews(now, days=35, scraper=None):
+def fetch_reviews(now, days=65, scraper=None):
     """지난 days일 리뷰를 받아 (요약 목록, 원문 목록)을 돌려준다.
 
     원문 목록은 저장 직전 유출 검사에만 쓰고 저장하지 않는다.

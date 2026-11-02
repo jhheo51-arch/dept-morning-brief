@@ -35,6 +35,8 @@ def test_full_run_writes_brief_without_raw_text(tmp_path):
     assert "테스트전용문장" not in read_all(tmp_path)
     for f in ["docs/data.js", "docs/brief.md", "docs/brief.json", "data/latest.json", "data/history/2026-11-05.json"]:
         assert (tmp_path / f).exists()
+    daily = json.loads((tmp_path / "data/history/reviews/daily.json").read_text(encoding="utf-8"))["days"]
+    assert len(daily) == 60 and sum(x["low"] for x in daily) == 1 and set(daily[0]) == {"date", "all", "low", "blocked"}
     md = (tmp_path / "docs/brief.md").read_text(encoding="utf-8")
     assert len(md) < 700  # 한 장, 2분 안에 읽히는 길이
 

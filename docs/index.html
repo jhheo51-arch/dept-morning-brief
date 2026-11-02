@@ -32,6 +32,7 @@ header.top{display:flex; justify-content:space-between; align-items:flex-end; ga
   background:var(--band); color:var(--band-ink); border-radius:12px; padding:22px 26px 20px; border-bottom:5px solid var(--orange)}
 .brand{font-size:13px; font-weight:700; color:var(--band-sub)}
 h1{font-size:26px; margin:4px 0 0; letter-spacing:-.02em}
+.how{font-size:13px; color:var(--band-sub); margin-top:6px}
 .meta{font-size:13px; color:var(--band-sub); text-align:right}
 .theme-btn{margin-top:6px; background:none; border:1px solid var(--band-sub); color:var(--band-ink); border-radius:6px; padding:4px 10px; font:inherit; font-size:12px; cursor:pointer}
 .headline{background:var(--card); border-left:6px solid var(--green); border-radius:10px; padding:18px 22px; margin-bottom:16px}
@@ -80,6 +81,7 @@ footer{font-size:13px; color:var(--muted); text-align:center; margin-top:24px}
     <div>
       <div class="brand">백화점 마케팅 아침 점검 에이전트 | 개인 포트폴리오</div>
       <h1 id="title">아침 점검</h1>
+      <div class="how">규칙으로 판단하는 자동 점검입니다. 매일 07시에 혼자 돌고, AI 요약은 선택입니다(키가 없으면 정해진 문장 틀).</div>
     </div>
     <div class="meta"><div id="runat"></div><button class="theme-btn" id="theme">화면 밝기 바꾸기</button></div>
   </header>
@@ -136,6 +138,7 @@ footer{font-size:13px; color:var(--muted); text-align:center; margin-top:24px}
     h+='<div class="kpis"><div class="kpi '+(r.low_new?'o':'g')+'"><div class="l">새 1~2점</div><div class="n">'+r.low_new+'<small>건</small></div><div class="s">4주 하루 평균 '+r.avg28_per_day+'건, 차이 '+r.diff_vs_avg+'</div></div>'
       +'<div class="kpi '+(r.blocked_new?'o':'g')+'"><div class="l">새 막힘</div><div class="n">'+r.blocked_new+'<small>건</small></div><div class="s">혜택 단어와 로그인, 실행 오류 단어가 함께</div></div>'
       +'<div class="kpi"><div class="l">지난 7일 1~2점</div><div class="n">'+r.low_7d+'<small>건</small></div><div class="s">막힘 '+r.blocked_7d+'건</div></div></div>';
+    if(r.totals30) h+='<p class="sub">최근 30일('+esc(r.totals30.from.slice(5).replace('-','/'))+'~'+esc(r.totals30.to.slice(5).replace('-','/'))+') 전체 리뷰 '+r.totals30.all+'건, 그중 1~2점 '+r.totals30.low+'건, 막힘 '+r.totals30.blocked+'건</p>';
     h+='<ul class="plain">'+Object.keys(r.topics_new).map(function(k){return '<li>'+esc(k)+' '+r.topics_new[k]+'건</li>'}).join('')+'</ul>';
     h+='<ul class="plain">'+r.reasons.map(function(x){return '<li>판단 근거: '+esc(x)+'</li>'}).join('')+'</ul>';
     h+=src(r.rule+' (막힘 1건 이상 또는 4주 평균의 2배 초과면 확인 필요)', r.source+'. 리뷰 원문, 작성자, 리뷰 ID는 저장하지 않음');
@@ -166,7 +169,7 @@ footer{font-size:13px; color:var(--muted); text-align:center; margin-top:24px}
   // 4.3
   var p=B.pilot; h='<h3>시범 점검<span class="v">가상 데이터</span></h3>';
   if(p){
-    h+='<div class="sub">6쪽 1번 시범, 시작 '+esc(p.start)+'(가정값), '+p.week+'주차'+(p.check_day?' <span class="tag warn">오늘 점검일</span>':'')+'</div>';
+    h+='<div class="sub">6쪽 1번 시범, 시작 '+esc(p.start)+'(가정값), '+(p.check_day?'<span class="tag warn">'+esc(p.week_label)+'</span>':esc(p.week_label||''))+'</div>';
     if(p.sent){
       h+='<div class="kpis"><div class="kpi g"><div class="l">1인당 평일 저녁 방문</div><div class="n">'+(p.visit_diff>0?'+':'')+p.visit_diff+'<small>회</small></div><div class="s">받은 회원 '+p.visits_per_member_sent+', 남겨 둔 회원 '+p.visits_per_member_hold+'</div></div>'
         +'<div class="kpi '+(p.new_ratio>p.breakeven?'g':'o')+'"><div class="l">새 방문 비율</div><div class="n">'+p.new_ratio+'<small>%</small></div><div class="s">본전 '+p.breakeven+'%(가정값)</div></div>'
@@ -194,6 +197,10 @@ footer{font-size:13px; color:var(--muted); text-align:center; margin-top:24px}
     });
     svg+='</svg>';
     var tl=s.reduce(function(a,x){return a+x.low},0), tb=s.reduce(function(a,x){return a+x.blocked},0);
+    var T=r.totals30, Tp=r.totals_prev30;
+    if(T) h+='<p class="sub"><b>최근 30일 전체 리뷰 '+T.all+'건, 1~2점 '+T.low+'건, 막힘 '+T.blocked+'건</b>'
+      +(T.low===0?'. 지난 30일에는 1~2점 리뷰가 없어 막대가 비어 있습니다':'')
+      +(Tp?'. 그 전 30일('+esc(Tp.from.slice(5).replace('-','/'))+'~'+esc(Tp.to.slice(5).replace('-','/'))+')은 전체 '+Tp.all+'건, 1~2점 '+Tp.low+'건, 막힘 '+Tp.blocked+'건':'')+'</p>';
     h+='<div class="legend"><span><i style="background:var(--gray)"></i>1~2점 '+tl+'건</span><span><i style="background:var(--orange)"></i>막힘 '+tb+'건</span></div><div class="chart">'+svg+'</div>';
   }
   var hs=(B.history||[]).slice().reverse();
@@ -201,7 +208,7 @@ footer{font-size:13px; color:var(--muted); text-align:center; margin-top:24px}
     h+='<table class="tbl" style="margin-top:10px"><tr><th>실행일</th><th>리뷰 판단</th><th>새 1~2점</th><th>시범(가상)</th><th>실패</th></tr>'+hs.slice(0,7).map(function(x){
       return '<tr><td class="d">'+esc(x.date)+'</td><td>'+esc(x.status||'-')+'</td><td>'+(x.low_new==null?'-':x.low_new)+'</td><td>'+esc(x.pilot||'-')+'</td><td>'+(esc((x.failures||[]).join(', '))||'-')+'</td></tr>'}).join('')+'</table>';
   }
-  h+=src('4.1과 같은 단어 규칙, 실행 기록은 data/history 의 날짜별 집계', 'Google Play 공개 리뷰, 원문 없이 건수만');
+  h+=src('4.1과 같은 단어 규칙, 실행 기록은 data/history, 일별 리뷰 건수는 data/history/reviews/daily.json', 'Google Play 공개 리뷰, 원문 없이 건수만');
   $('hist').innerHTML=h;
 })();
 </script>

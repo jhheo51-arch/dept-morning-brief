@@ -32,10 +32,15 @@ def rule_reviews(rows, now, since):
         reasons.append(f"새 막힘 {blocked_new}건(1건 이상)")
     if len(new) > 2 * expected:
         reasons.append(f"새 1~2점 {len(new)}건이 4주 평균의 2배({2 * expected:.1f}건)를 넘음")
-    days = [(now.date() - dt.timedelta(days=i)) for i in range(29, -1, -1)]
-    series = [{"date": d.isoformat(),
-               "low": sum(1 for r in low if r["at"].date() == d),
-               "blocked": sum(1 for r in low if r["at"].date() == d and r["blocked"])} for d in days]
+    days = [(now.date() - dt.timedelta(days=i)) for i in range(59, -1, -1)]
+    daily = [{"date": d.isoformat(),
+              "all": sum(1 for r in rows if r["at"].date() == d),
+              "low": sum(1 for r in low if r["at"].date() == d),
+              "blocked": sum(1 for r in low if r["at"].date() == d and r["blocked"])} for d in days]
+
+    def total(part):
+        return {"from": part[0]["date"], "to": part[-1]["date"],
+                **{k: sum(x[k] for x in part) for k in ("all", "low", "blocked")}}
     return {
         "rule": "4.1 고객 접점 알림",
         "since": since.strftime("%Y-%m-%d %H:%M"),
@@ -50,7 +55,10 @@ def rule_reviews(rows, now, since):
         "places_7d": dict(places.most_common()),
         "status": "확인 필요" if alert else "평소",
         "reasons": reasons or ["막힘 0건, 새 1~2점이 4주 평균의 2배 이하"],
-        "series30": series,
+        "series30": daily[30:],
+        "daily60": daily,
+        "totals30": total(daily[30:]),
+        "totals_prev30": total(daily[:30]),
         "source": "Google Play 공개 리뷰(현대백화점 앱), 포트폴리오 5쪽과 같은 단어 규칙",
     }
 
@@ -105,10 +113,15 @@ def rule_calendar(today, weather, review_alert):
 # 4.3 시범 점검(가상)
 def rule_pilot(today, sim):
     weeks_done = min((today - C.PILOT_START).days // 7, C.PILOT_WEEKS)
-    week_now = min(weeks_done + 1, C.PILOT_WEEKS)
     check_day = any(today == C.PILOT_START + dt.timedelta(weeks=w) for w in C.CHECK_WEEKS)
+    if weeks_done <= 0:
+        label = "집계 전"
+    elif check_day:
+        label = f"{weeks_done}주차 점검일"
+    else:
+        label = f"{weeks_done}주 누적"
     out = {"rule": "4.3 시범 점검", "virtual": True, "start": C.PILOT_START.isoformat(),
-           "week": week_now, "weeks_done": weeks_done, "check_day": check_day,
+           "week_label": label, "weeks_done": weeks_done, "check_day": check_day,
            "source": "가상 데이터(SEED 2026, 가상 회원 2만 명, 방문 확률은 설정값), 본전 25%는 가정값"}
     if weeks_done <= 0:
         out.update(decision="집계 전", reasons=["첫 주가 끝나지 않음"])

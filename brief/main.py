@@ -86,7 +86,7 @@ def run(now=None, root=ROOT, review_fetch=None, weather_fetch=None, summarizer=N
     out["field"] = judge.rule_field(out["review"], out["calendar"])
 
     judgment = {k: v for k, v in out.items() if v}
-    slim = {k: ({kk: vv for kk, vv in v.items() if kk != "series30"} if v else v) for k, v in judgment.items()}
+    slim = {k: ({kk: vv for kk, vv in v.items() if kk not in ("series30", "daily60")} if v else v) for k, v in judgment.items()}
     summary = (summarizer or write.llm_summary)(slim)
     brief = {
         "date": today.isoformat(),
@@ -108,6 +108,15 @@ def run(now=None, root=ROOT, review_fetch=None, weather_fetch=None, summarizer=N
             "pilot": (out["pilot"] or {}).get("decision"), "failures": [f["step"] for f in failures]}
     (data / "history" / f"{brief['date']}.json").write_text(
         json.dumps(hist, ensure_ascii=False, indent=1), encoding="utf-8")
+    if out["review"] and not out["review"].get("stale"):
+        # 리뷰 작성일 기준 일별 건수. 첫 실행 전 기간도 채우고, 지난 날은 새 집계로 덮는다
+        daily_path = data / "history" / "reviews" / "daily.json"
+        daily_path.parent.mkdir(exist_ok=True)
+        daily = {x["date"]: x for x in _load(daily_path).get("days", [])}
+        daily.update({x["date"]: x for x in out["review"]["daily60"]})
+        daily_path.write_text(json.dumps(
+            {"note": "Google Play 공개 리뷰의 작성일별 건수(전체, 1~2점, 막힘). 원문, 작성자, 리뷰 ID 없음",
+             "days": [daily[k] for k in sorted(daily)]}, ensure_ascii=False, indent=1), encoding="utf-8")
     history = [_load(p) for p in sorted((data / "history").glob("*.json"))[-30:]]
 
     (data / "latest.json").write_text(json.dumps(brief, ensure_ascii=False, indent=1), encoding="utf-8")
