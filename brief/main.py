@@ -14,8 +14,10 @@ from .collect import KST
 
 ROOT = C.ROOT
 BLOCKS = {"review": "리뷰 수집", "calendar": "날씨 예보 수집", "pilot": "시범 계산", "field": "현장 목록 판단",
-          "sales": "매출 파일 읽기", "promos": "행사 파일 읽기"}
-FILES = {"sales": "sales", "promos": "promotions", "pilot": "pilot_weekly", "field": "field_log"}
+          "sales": "매출 파일 읽기", "promos": "행사 파일 읽기", "promo_results": "행사 성과 계산",
+          "touch": "접점 숫자 파일 읽기", "weekly": "주간 정리"}
+FILES = {"sales": "sales", "promos": "promotions", "pilot": "pilot_weekly", "field": "field_log",
+         "touch": "touchpoint_daily"}
 
 
 class LeakError(RuntimeError):
@@ -53,7 +55,7 @@ def run(now=None, root=ROOT, review_fetch=None, weather_fetch=None, summarizer=N
     (data / "history").mkdir(parents=True, exist_ok=True)
     docs.mkdir(parents=True, exist_ok=True)
     if not C.SAMPLE:  # 내 데이터 화면은 output/site 에 따로 둔다. 화면 파일은 매번 새로 복사
-        shutil.copyfile(C.ROOT / "docs" / "index.html", docs / "index.html")
+        shutil.copyfile(C.BUNDLE / "docs" / "index.html", docs / "index.html")
     if C.SAMPLE:
         samples.make(in_dir, today)
     prev = _load(data / "latest.json")
@@ -77,15 +79,24 @@ def run(now=None, root=ROOT, review_fetch=None, weather_fetch=None, summarizer=N
             missing.append(f"{FILES[key]}.xlsx")
         return rows
 
-    # 매출 현황
-    for key, rule in (("sales", judge.rule_sales), ("promos", judge.rule_promos)):
+    # 매출 현황, 행사 점검, 접점 숫자
+    ok_rows = {}
+    for key, rule in (("sales", judge.rule_sales), ("promos", judge.rule_promos), ("touch", judge.rule_touch)):
         try:
             rows = table(key)
             out[key] = rule(rows, today) if rows else None
             if rows:
                 last_ok[key] = today.isoformat()
+                ok_rows[key] = rows
         except I.InputError as e:
             out[key] = fallback(key, e)
+    # 행사 성과는 행사 파일과 매출 파일을 둘 다 읽었을 때만
+    out["promo_results"] = None
+    if "sales" in ok_rows and "promos" in ok_rows:
+        try:
+            out["promo_results"] = judge.rule_promo_results(ok_rows["promos"], ok_rows["sales"], today)
+        except I.InputError as e:
+            out["promo_results"] = fallback("promo_results", e)
 
     # 4.1
     if C.APP_ID:
@@ -123,15 +134,17 @@ def run(now=None, root=ROOT, review_fetch=None, weather_fetch=None, summarizer=N
         out["pilot"] = fallback("pilot", e)
 
     # 4.4
+    log = None
     try:
         log = table("field")
-        out["field"] = judge.rule_field(out["review"], out["calendar"], log, today)
+        out["field"] = judge.rule_field(out["review"], out["calendar"], log, today, out["touch"])
     except I.InputError as e:
         fallback("field", e)
-        out["field"] = judge.rule_field(out["review"], out["calendar"])
+        log = None
+        out["field"] = judge.rule_field(out["review"], out["calendar"], touch=out["touch"])
 
     judgment = {k: v for k, v in out.items() if v}
-    slim = {k: ({kk: vv for kk, vv in v.items() if kk not in ("series30", "daily60")} if v else v)
+    slim = {k: ({kk: vv for kk, vv in v.items() if kk not in ("series30", "daily60", "week")} if v else v)
             for k, v in judgment.items()}
     if summarizer is None:
         # 내 데이터 모드에서는 allow_llm 을 켠 경우에만 판단 결과가 외부 API로 나간다
@@ -151,6 +164,10 @@ def run(now=None, root=ROOT, review_fetch=None, weather_fetch=None, summarizer=N
         "last_ok": last_ok,
         **out,
     }
+    try:
+        brief["weekly"] = judge.week_summary(today, out, log)
+    except I.InputError as e:
+        brief["weekly"] = fallback("weekly", e)
     if out["review"] is None and C.APP_ID:
         brief["run_at"] = prev.get("run_at", brief["run_at"])  # 새 리뷰 기준 시각은 성공한 실행만 옮긴다
 
@@ -161,7 +178,8 @@ def run(now=None, root=ROOT, review_fetch=None, weather_fetch=None, summarizer=N
             "pilot": (out["pilot"] or {}).get("decision"), "failures": [f["step"] for f in failures],
             "sales_status": (out["sales"] or {}).get("status"),
             "sales_yoy": ((out["sales"] or {}).get("total") or {}).get("yoy_pct"),
-            "promo_warn": (out["promos"] or {}).get("warn_count")}
+            "promo_warn": (out["promos"] or {}).get("warn_count"),
+            "touch_flags": len((out["touch"] or {}).get("flagged", [])) if out["touch"] else None}
     (data / "history" / f"{brief['date']}.json").write_text(
         json.dumps(hist, ensure_ascii=False, indent=1), encoding="utf-8")
     if out["review"] and not out["review"].get("stale"):
@@ -178,6 +196,8 @@ def run(now=None, root=ROOT, review_fetch=None, weather_fetch=None, summarizer=N
     (data / "latest.json").write_text(json.dumps(brief, ensure_ascii=False, indent=1), encoding="utf-8")
     (docs / "brief.json").write_text(json.dumps(brief, ensure_ascii=False, indent=1), encoding="utf-8")
     (docs / "brief.md").write_text(write.brief_markdown(brief), encoding="utf-8")
+    if brief["weekly"]:
+        (docs / "weekly.md").write_text(write.weekly_markdown(brief), encoding="utf-8")
     (docs / "data.js").write_text("window.BRIEF = " + json.dumps({**brief, "history": history}, ensure_ascii=False)
                                   + ";\n", encoding="utf-8")
 

@@ -1,0 +1,2 @@
+# bat 파일은 CRLF 여야 cmd 가 한글 줄을 바르게 읽는다
+*.bat text eol=crlf

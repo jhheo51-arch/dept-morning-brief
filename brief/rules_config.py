@@ -4,10 +4,14 @@
 """
 import datetime as dt
 import os
+import sys
 import tomllib
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parent.parent
+# exe(PyInstaller)로 돌 때는 exe 옆 폴더가 작업 폴더이고, 기본 설정과 화면 파일은 exe 안에 묶여 있다
+FROZEN = getattr(sys, "frozen", False)
+ROOT = Path(sys.executable).parent if FROZEN else Path(__file__).resolve().parent.parent
+BUNDLE = Path(getattr(sys, "_MEIPASS", ROOT))
 
 # 포트폴리오 5쪽과 같은 단어 규칙(현대백화점-apply/analysis/review_topics.py 의 TOPICS)
 TOPICS = {
@@ -32,7 +36,7 @@ def _merge(base, over):
 
 def config_paths():
     """BRIEF_CONFIG 가 있으면 그 파일을, 없으면 config.local.toml 을 기본 설정 위에 덮는다."""
-    paths = [ROOT / "config.toml"]
+    paths = [BUNDLE / "config.toml"]
     local = Path(os.environ["BRIEF_CONFIG"]) if os.environ.get("BRIEF_CONFIG") else ROOT / "config.local.toml"
     if local.exists():
         paths.append(local)
@@ -73,6 +77,8 @@ def load(paths=None):
     g["CHANNELS"], g["CHANNEL_NOTE"] = CAL["channels"], CAL.get("channel_note", "")
     g["PILOTS"] = {int(k): v for k, v in cfg["pilots"].items()}
     g["SALES"], g["PROMO"] = cfg["sales"], cfg["promotions"]
+    g["COLUMNS"] = cfg.get("columns", {})
+    g["TOUCH"] = cfg.get("touchpoint_daily", {})
 
     p = cfg["pilot"]
     g["PILOT_START"] = p["start"] if isinstance(p["start"], dt.date) else dt.date.fromisoformat(p["start"])

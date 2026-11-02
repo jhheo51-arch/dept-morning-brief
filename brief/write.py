@@ -30,8 +30,8 @@ def _sales_line(s):
 
 def top_three(out):
     """확인 필요 항목을 먼저, 그다음 오늘 할 일. 최대 세 줄."""
-    sales, promos, review, calendar, pilot, field = (out.get(k) for k in
-                                                     ("sales", "promos", "review", "calendar", "pilot", "field"))
+    sales, promos, review, calendar, pilot, field, touch, res = (out.get(k) for k in (
+        "sales", "promos", "review", "calendar", "pilot", "field", "touch", "promo_results"))
     urgent, usual = [], []
     if sales:
         line = f"매출 {sales['status']}: {_sales_line(sales)}"
@@ -46,6 +46,13 @@ def top_three(out):
             urgent.append(f"행사 {i['name']}: {', '.join(i['warns'])}{more}")
         elif promos["items"]:
             usual.append(f"행사 진행 {promos['running']}건, 7일 안 시작 {promos['upcoming']}건, 경고 없음")
+    if res and res["status"] == "확인 필요":
+        i = next(i for i in res["items"] if i["flag"])
+        urgent.append(f"행사 성과 {i['name']}: {i['part']} 매출 앞 같은 요일 기간 대비 {i['growth']:+}%")
+    if touch and touch["flagged"]:
+        t = touch["flagged"][0]
+        more = f" 외 {len(touch['flagged']) - 1}건" if len(touch["flagged"]) > 1 else ""
+        urgent.append(f"접점 숫자 {t['place']} {t['metric']}: {t['value']:,.0f}, 평소 대비 {t['change_pct']:+}%{more}")
     if review:
         line = (f"앱 리뷰 {review['status']}: 새 1~2점 {review['low_new']}건, 막힘 {review['blocked_new']}건"
                 f"(지난 7일 1~2점 {review['low_7d']}건)")
@@ -63,12 +70,17 @@ def top_three(out):
 
 
 def template_summary(out):
-    sales, promos, review, calendar, pilot = (out.get(k) for k in ("sales", "promos", "review", "calendar", "pilot"))
+    sales, promos, review, calendar, pilot, touch, res = (out.get(k) for k in (
+        "sales", "promos", "review", "calendar", "pilot", "touch", "promo_results"))
     s = []
     if sales:
         s.append(f"{_sales_line(sales)}로 {sales['status']}입니다.")
     if promos and promos["warn_count"]:
         s.append(f"행사 {len(promos['items'])}건 중 {promos['warn_count']}건에 경고가 있습니다.")
+    if res and res["status"] == "확인 필요":
+        s.append(f"행사 성과는 {sum(i['flag'] for i in res['items'])}건이 앞 같은 요일 기간보다 낮습니다.")
+    if touch and touch["flagged"]:
+        s.append(f"접점 숫자 {len(touch['flagged'])}건이 평소와 다릅니다.")
     if review:
         t = review.get("totals30")
         s.append(f"앱 리뷰는 {review['status']}입니다. 새 1~2점은 {review['low_new']}건, 막힘은 "
@@ -106,7 +118,10 @@ def llm_summary(judgment, client=None):
     if client is None:
         if not os.environ.get("ANTHROPIC_API_KEY"):
             return None
-        import anthropic
+        try:
+            import anthropic
+        except ImportError:  # exe 판은 anthropic 을 묶지 않는다
+            return None
         client = anthropic.Anthropic()
     prompt = ("아래 JSON은 백화점 마케팅 담당자의 아침 점검 판단 결과입니다. 한국어 3문장으로 요약하세요. "
               "JSON에 없는 숫자는 쓰지 마세요. 확인 필요 항목을 먼저 쓰세요. 판단을 바꾸지 마세요. 가상 데이터는 가상이라고 밝히세요. "
@@ -133,4 +148,15 @@ def brief_markdown(b):
         lines += [f"아직 없는 파일: {', '.join(b['missing'])}(넣으면 그 블록이 나옵니다)", ""]
     lines += ["공개 데이터와 가상 데이터만 씁니다. 현대백화점 내부 자료가 아닙니다." if b.get("mode", "sample") == "sample"
               else "내 업무 파일로 만든 점검입니다. 외부에 공유하지 마세요.", ""]
+    return "\n".join(lines)
+
+
+def weekly_markdown(b):
+    w = b["weekly"]
+    lines = [f"# 주간 정리 {w['from']} ~ {w['to']}" + (f" | {b['store_name']}" if b.get("store_name") else ""), ""]
+    for sec in w["sections"]:
+        lines += [f"## {sec['title']}"] + [f"- {x}" for x in sec["lines"]] + [""]
+    lines += [f"만든 날 {b['date']}. {w['source']}.",
+              "가상 데이터로 만든 시연입니다." if b.get("mode", "sample") == "sample"
+              else "내 업무 파일로 만든 초안입니다. 외부에 공유하지 마세요.", ""]
     return "\n".join(lines)

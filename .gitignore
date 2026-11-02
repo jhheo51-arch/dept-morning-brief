@@ -8,3 +8,7 @@ config.local.toml
 inputs/
 output/
 samples/
+
+# exe 빌드 결과는 올리지 않는다
+dist/
+build/

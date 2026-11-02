@@ -34,6 +34,19 @@ repo_url = ""
 # [pilot]
 # start = 2026-11-16        # 내 시범 시작일
 # breakeven_pct = 25        # 내 본전 비율
+
+# [promotions]
+# result_days = 14          # 끝난 뒤 며칠까지 행사 성과를 보여 줄지
+# result_low_pct = 0        # 앞 같은 요일 기간 대비 이 % 미만이면 확인 필요
+
+# [touchpoint_daily]
+# change_pct = 30           # 평소(직전 4주 같은 요일 평균)보다 이 % 넘게 다르면 확인 필요
+# min_value = 5             # 평소 값이 이보다 작으면 % 판단을 하지 않음
+
+# 사내 파일 열 이름이 양식과 다르면 여기에 적습니다. 왼쪽이 양식 열 이름, 오른쪽이 내 파일 열 이름입니다.
+# [columns.sales]
+# "날짜" = ["매출일자", "일자"]
+# "매출" = "순매출"
 """
 
 
@@ -60,7 +73,7 @@ def make_templates(folder):
             help_ws.append([col, "예" if col in need else "아니요", I.HELP[name].get(col, "")])
         help_ws.column_dimensions["C"].width = 70
         help_ws.append([])
-        help_ws.append(["첫 시트(입력)만 읽습니다. 첫 줄 열 이름은 바꾸지 마세요. 빈 줄은 건너뜁니다."])
+        help_ws.append(["첫 시트(입력)만 읽습니다. 열 이름은 양식대로 두는 것이 가장 쉽습니다. 사내 파일 열 이름이 다르면 config.local.toml 의 [columns] 에 적습니다. 열 이름 줄 위의 제목 줄(10줄까지)과 첫 칸이 합계, 소계인 줄, 빈 줄은 건너뜁니다."])
         wb.save(p)
         made.append(p)
     return made
@@ -76,7 +89,8 @@ def main():
         print(f"있음(그대로 둠): {local}")
     for p in make_templates(C.ROOT / "inputs"):
         print(f"만듦: {p}")
-    print("\n다음: inputs/ 의 엑셀에 내 자료를 붙여 넣고 `python -m brief.main` 을 실행하면 "
+    how = "run_brief.bat" if C.FROZEN else "python -m brief.main"
+    print(f"\n다음: inputs/ 의 엑셀에 내 자료를 붙여 넣고 `{how}` 을 실행하면 "
           "output/site/index.html 이 생깁니다. 없는 파일의 블록은 건너뜁니다.")
 
 

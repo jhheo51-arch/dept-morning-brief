@@ -211,3 +211,62 @@ def test_init_templates(tmp_path):
     assert init.make_templates(tmp_path) == []  # 있는 파일은 덮지 않는다
     for name in I.SCHEMAS:
         assert I.read_table(name, tmp_path) == []
+
+
+# 열 이름 맞춤
+def test_column_alias_title_rows_and_total_rows(tmp_path):
+    real_mode(tmp_path, '[columns.sales]\n"날짜" = ["매출일자", "일자"]\n"매출" = "순매출"\n')
+    write_csv(tmp_path, "sales", ["11월 매출 보고"], [[], ["매출일자", "구분", "순매출"],
+                                                      ["2026-11-04", "식품", "100"], ["합계", "", "100"]])
+    rows = I.read_table("sales", tmp_path)
+    assert [r["날짜"] for r in rows] == ["2026-11-04"] and rows[0]["매출"] == "100"
+    assert rows[0]["_row"] == 4  # 제목 줄을 건너뛰어도 엑셀 행 번호는 그대로
+    write_csv(tmp_path, "sales", ["일자", "구분"], [["2026-11-04", "식품"]])
+    with pytest.raises(I.InputError, match=r"\[columns.sales\]"):
+        I.read_table("sales", tmp_path)
+
+
+# 행사 성과
+def test_promo_results_against_same_weekdays_before(tmp_path):
+    days = [TODAY - dt.timedelta(days=k) for k in range(1, 20)]
+    sales = sales_rows(tmp_path, [[d.isoformat(), "식품", 80 if d >= dt.date(2026, 11, 2) else 100, "", ""]
+                                  for d in days])
+    write_csv(tmp_path, "promotions", ["행사명", "시작일", "종료일", "매출 구분"], [
+        ["가", "2026-11-02", "2026-11-08", "식품"],   # 진행 중, 11/02~11/04 를 10/26~10/28 과 견줌
+        ["나", "2026-11-02", "2026-11-03", "리빙"],   # 리빙 매출이 없음
+        ["다", "2026-11-07", "2026-11-09", "식품"],   # 아직 시작 전
+        ["라", "2026-09-01", "2026-09-05", "식품"],   # 끝난 지 오래됨
+    ])
+    r = judge.rule_promo_results(I.read_table("promotions", tmp_path), sales, TODAY)
+    by = {i["name"]: i for i in r["items"]}
+    assert set(by) == {"가", "나"}
+    assert by["가"]["base_from"] == "2026-10-26" and by["가"]["base_to"] == "2026-10-28" and by["가"]["to"] == "2026-11-04"
+    assert by["가"]["growth"] == -20.0 and by["가"]["flag"] and r["status"] == "확인 필요"
+    assert "견주지 않음" in by["나"]["note"] and not by["나"]["flag"]
+
+
+# 접점 숫자
+def test_touch_numbers_flag_and_small_values(tmp_path):
+    rows = []
+    for k in range(5):
+        d = (dt.date(2026, 11, 4) - dt.timedelta(weeks=k)).isoformat()
+        rows += [[d, "고객 상담실", "문의 앱 혜택", 20 if k == 0 else 10], [d, "문화센터", "취소", 4 if k == 0 else 1]]
+    write_csv(tmp_path, "touchpoint_daily", ["날짜", "접점", "지표", "값"], rows)
+    t = judge.rule_touch(I.read_table("touchpoint_daily", tmp_path), TODAY)
+    by = {i["metric"]: i for i in t["items"]}
+    assert by["문의 앱 혜택"]["change_pct"] == 100.0 and by["문의 앱 혜택"]["flag"]
+    assert by["취소"]["change_pct"] is None and not by["취소"]["flag"]  # 평소 1은 min_value 5 미만
+    assert [i["metric"] for i in t["flagged"]] == ["문의 앱 혜택"]
+    f = judge.rule_field(None, None, None, TODAY, touch=t)
+    assert f["items"][0]["place"] == "고객 상담실" and "문의 앱 혜택 20" in f["items"][0]["why"]
+
+
+# 주간 정리와 새 블록
+def test_sample_mode_new_blocks_and_weekly(tmp_path):
+    b = main.run(NOW, tmp_path, lambda now: ([], []), lambda d: {}, lambda j: None)
+    assert b["promo_results"]["items"] and b["touch"]["flagged"] and not b["failures"]
+    titles = [s["title"] for s in b["weekly"]["sections"]]
+    assert titles[:2] == ["매출", "행사 성과"] and b["weekly"]["to"] == "2026-11-04"
+    md = (tmp_path / "docs" / "weekly.md").read_text(encoding="utf-8")
+    assert md.startswith("# 주간 정리 2026-10-29 ~ 2026-11-04") and "가상" in md
+    assert "·" not in md and "→" not in md

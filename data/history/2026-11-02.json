@@ -6,7 +6,8 @@
  "low_7d": 0,
  "pilot": "넓힌다(현재 신호)",
  "failures": [],
- "sales_status": "확인 필요",
- "sales_yoy": -7.0,
- "promo_warn": 2
+ "sales_status": "평소",
+ "sales_yoy": -1.7,
+ "promo_warn": 2,
+ "touch_flags": 1
 }

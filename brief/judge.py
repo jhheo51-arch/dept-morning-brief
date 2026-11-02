@@ -35,8 +35,8 @@ def _src(file):
 
 
 # 매출 현황
-def rule_sales(rows, today):
-    """rows: inputs/sales 파일. 가장 최근 날짜(오늘 전)의 전체 매출을 목표와 전년에 견준다."""
+def sales_by_day(rows, today):
+    """sales 파일을 {날짜: {구분: 값}} 으로. 오늘(마감 전)은 뺀다."""
     recs = []
     for r in rows:
         d = I.to_date(r["날짜"], r, "날짜")
@@ -46,24 +46,33 @@ def rule_sales(rows, today):
         recs.append({"date": d, "part": part, "sales": I.to_num(r["매출"], r, "매출"),
                      "target": I.to_num(r.get("목표"), r, "목표", required=False),
                      "prev": I.to_num(r.get("전년"), r, "전년", required=False)})
-    recs = [x for x in recs if x["date"] < today]
-    if not recs:
-        raise I.InputError("sales 파일에 오늘 전 날짜의 매출이 없습니다")
-    total_name = C.SALES.get("total_name", "전체")
     by_day = collections.defaultdict(dict)
     for x in recs:
-        by_day[x["date"]][x["part"]] = x
+        if x["date"] < today:
+            by_day[x["date"]][x["part"]] = x
+    return by_day
 
-    def total_of(day):
-        parts = by_day[day]
-        if total_name in parts:
-            return parts[total_name]
-        vals = list(parts.values())
 
-        def add(k):
-            got = [v[k] for v in vals if v[k] is not None]
-            return sum(got) if len(got) == len(vals) else None
-        return {"date": day, "part": total_name, "sales": add("sales"), "target": add("target"), "prev": add("prev")}
+def total_of(by_day, day):
+    """그날 전체 매출. 파일에 전체 구분이 없으면 나머지 구분을 더한다."""
+    total_name = C.SALES.get("total_name", "전체")
+    parts = by_day.get(day, {})
+    if total_name in parts:
+        return parts[total_name]
+    vals = list(parts.values())
+
+    def add(k):
+        got = [v[k] for v in vals if v[k] is not None]
+        return sum(got) if vals and len(got) == len(vals) else None
+    return {"date": day, "part": total_name, "sales": add("sales"), "target": add("target"), "prev": add("prev")}
+
+
+def rule_sales(rows, today):
+    """rows: inputs/sales 파일. 가장 최근 날짜(오늘 전)의 전체 매출을 목표와 전년에 견준다."""
+    by_day = sales_by_day(rows, today)
+    if not by_day:
+        raise I.InputError("sales 파일에 오늘 전 날짜의 매출이 없습니다")
+    total_name = C.SALES.get("total_name", "전체")
 
     def metrics(x):
         return {"sales": x["sales"], "sales_text": _won(x["sales"]), "target": x["target"], "prev": x["prev"],
@@ -78,7 +87,7 @@ def rule_sales(rows, today):
 
     day = max(by_day)
     days = sorted(by_day)
-    totals = {d: total_of(d) for d in days}
+    totals = {d: total_of(by_day, d) for d in days}
     yoy_thr, tgt_thr = C.SALES.get("yoy_alert_pct", -10), C.SALES.get("target_alert_pct", 90)
     t = metrics(totals[day])
     mtd = metrics(sum_of([totals[d] for d in days if d.year == day.year and d.month == day.month]))
@@ -164,6 +173,93 @@ def rule_promos(rows, today):
         "status": "확인 필요" if warned else "평소",
         "rule_text": f"시작 D-{ready}까지 VMD가 {', '.join(sorted(done))} 이 아니면 경고, 알릴 길이 비면 경고, {look}일 안 시작까지 봄",
         "source": _src(rows[0]["_file"]) if rows else "행사 파일",
+    }
+
+
+def rule_promo_results(promo_rows, sales_rows, today):
+    """시작한 행사의 기간 매출(어제까지)을 바로 앞 같은 요일 기간과 견준다. 매출 구분이 있으면 그 구분만 본다."""
+    keep, low = C.PROMO.get("result_days", 14), C.PROMO.get("result_low_pct", 0)
+    total_name = C.SALES.get("total_name", "전체")
+    by_day = sales_by_day(sales_rows, today)
+    items = []
+    for r in promo_rows:
+        s, e = I.to_date(r["시작일"], r, "시작일"), I.to_date(r["종료일"], r, "종료일")
+        last = min(e, today - dt.timedelta(days=1))
+        if s >= today or last < s or (today - e).days > keep:
+            continue
+        part = str(r.get("매출 구분") or "").strip() or total_name
+        days = [s + dt.timedelta(days=i) for i in range((last - s).days + 1)]
+        shift = dt.timedelta(days=7 * math.ceil(len(days) / 7))
+        base_days = [d - shift for d in days]
+
+        def value(d, k="sales"):
+            x = total_of(by_day, d) if part == total_name else by_day.get(d, {}).get(part)
+            return x[k] if x else None
+        now_v = [value(d) for d in days]
+        base_v = [value(d) for d in base_days]
+        prev_v = [value(d, "prev") for d in days]
+        item = {"name": str(r["행사명"] or "").strip(), "part": part, "start": s.isoformat(), "end": e.isoformat(),
+                "to": last.isoformat(), "days": len(days), "ended": e < today,
+                "base_from": base_days[0].isoformat(), "base_to": base_days[-1].isoformat(), "flag": False}
+        if None in now_v or None in base_v:
+            gap = [d.isoformat() for d, v in zip(days + base_days, now_v + base_v) if v is None]
+            item["note"] = f"sales 파일에 '{part}' 매출이 없는 날이 있어 견주지 않음({gap[0]} 등 {len(gap)}일)"
+        else:
+            item.update(sales=sum(now_v), base=sum(base_v), sales_text=_won(sum(now_v)), base_text=_won(sum(base_v)),
+                        growth=_growth(sum(now_v), sum(base_v)),
+                        yoy=_growth(sum(now_v), sum(prev_v)) if None not in prev_v else None)
+            item["flag"] = item["growth"] is not None and item["growth"] <= low
+        items.append(item)
+    items.sort(key=lambda x: (not x["flag"], x["start"]))
+    return {
+        "rule": "행사 성과",
+        "items": items,
+        "status": "확인 필요" if any(i["flag"] for i in items) else "평소",
+        "rule_text": f"행사 기간(어제까지) 매출을 바로 앞 같은 요일 기간과 견줌, {low}% 이하이면 확인 필요, "
+                     f"끝난 뒤 {keep}일까지 보여 줌. 앞 기간에 다른 행사가 있었으면 차이가 작게 나옴",
+        "source": f"{_src(promo_rows[0]['_file'])}, {_src(sales_rows[0]['_file'])}" if promo_rows else "",
+    }
+
+
+# 문화센터, 라운지, 상담실 같은 접점의 하루 숫자
+def rule_touch(rows, today):
+    """접점과 지표별로 최근 날짜 값을 직전 4주 같은 요일 평균과 견준다. 지난 7일 합도 그 앞 7일과 견준다."""
+    thr, floor = C.TOUCH.get("change_pct", 30), C.TOUCH.get("min_value", 5)
+    vals = collections.defaultdict(dict)
+    for r in rows:
+        d = I.to_date(r["날짜"], r, "날짜")
+        place, metric = str(r["접점"] or "").strip(), str(r["지표"] or "").strip()
+        if not place or not metric:
+            raise I.InputError(f"{I.where(r)} '접점'과 '지표'는 비울 수 없습니다")
+        v = I.to_num(r["값"], r, "값")
+        if d < today:
+            vals[(place, metric)][d] = vals[(place, metric)].get(d, 0) + v
+    items, week = [], []
+    end = today - dt.timedelta(days=1)
+    for (place, metric), by in vals.items():
+        day = max(by)
+        base = [by[day - dt.timedelta(weeks=k)] for k in range(1, 5) if day - dt.timedelta(weeks=k) in by]
+        avg = sum(base) / len(base) if base else None
+        chg = _growth(by[day], avg) if avg and avg >= floor and len(base) >= 2 else None
+        items.append({"place": place, "metric": metric, "date": day.isoformat(), "value": by[day],
+                      "base": round(avg, 1) if avg is not None else None, "base_n": len(base), "change_pct": chg,
+                      "flag": chg is not None and abs(chg) >= thr, "stale_days": (today - day).days})
+        this = sum(v for d, v in by.items() if end - dt.timedelta(days=6) <= d <= end)
+        last = sum(v for d, v in by.items() if end - dt.timedelta(days=13) <= d <= end - dt.timedelta(days=7))
+        week.append({"place": place, "metric": metric, "this_week": this, "last_week": last,
+                     "change_pct": _growth(this, last)})
+    items.sort(key=lambda x: (not x["flag"], -abs(x["change_pct"] or 0), x["place"]))
+    flagged = [i for i in items if i["flag"]]
+    return {
+        "rule": "접점 숫자",
+        "items": items[:C.TOUCH.get("max_rows", 8)],
+        "all_count": len(items),
+        "flagged": flagged,
+        "week": week,
+        "status": "확인 필요" if flagged else "평소",
+        "rule_text": f"최근 값이 직전 4주 같은 요일 평균보다 {thr}% 이상 늘거나 줄면 표시. 평균이 {floor} 미만이거나 "
+                     "같은 요일 기록이 2주 미만이면 % 판단을 하지 않음",
+        "source": _src(rows[0]["_file"]) if rows else "",
     }
 
 
@@ -380,7 +476,7 @@ def _last_visits(log, today, skipped):
     return last
 
 
-def rule_field(review, calendar, log=None, today=None):
+def rule_field(review, calendar, log=None, today=None, touch=None):
     items = []
 
     def add(place, why):
@@ -395,6 +491,8 @@ def rule_field(review, calendar, log=None, today=None):
     for place, x in sorted(last.items(), key=lambda kv: kv[1]["date"]):
         if x["result"] in ("문제", "해결 중"):
             add(place, f"{x['date'].isoformat()} 방문 때 결과 '{x['result']}', 다시 확인")
+    for t in (touch or {}).get("flagged", []):
+        add(t["place"], f"{t['metric']} {t['value']:,.0f}, 평소 {t['base']:,.1f} 대비 {t['change_pct']:+}%")
     f = C.FIELD
     if calendar:
         t = calendar["days"][0]
@@ -426,3 +524,68 @@ def rule_field(review, calendar, log=None, today=None):
             "logged": log is not None, "skipped": skipped,
             "last_visits": {k: {"date": v["date"].isoformat(), "result": v["result"]} for k, v in last.items()},
             "source": "리뷰와 달력 결과, 현장 기록(field_log), 점검 질문은 설정 파일의 고정 목록"}
+
+
+# 주간 정리
+def week_summary(today, out, field_log=None):
+    """지난 7일(어제까지)을 한 장으로. 오늘 판단 결과와 현장 기록에서 묶는다. 새로 세는 것은 기간 합과 일수뿐."""
+    end = today - dt.timedelta(days=1)
+    start = end - dt.timedelta(days=6)
+    v = "(가상)" if C.SAMPLE else ""
+    sections = []
+    sales = out.get("sales")
+    if sales:
+        w = sales["last7"]
+        days = [x for x in sales.get("series30", []) if start.isoformat() <= x["date"] <= end.isoformat()]
+        low = [x["date"][5:] for x in days
+               if x["target"] and x["sales"] < x["target"] * sales["target_alert_pct"] / 100]
+        lines = [f"7일 매출{v} {_won(w['sales'])}"
+                 + (f", 목표 {w['achieve_pct']}%" if w["achieve_pct"] is not None else "")
+                 + (f", 전년 대비 {w['yoy_pct']:+}%" if w["yoy_pct"] is not None else "")]
+        lines.append(f"목표 {sales['target_alert_pct']}% 미만인 날 {len(low)}일" + (f"({', '.join(low)})" if low else ""))
+        if sales["date"] != end.isoformat():
+            lines.append(f"매출 파일 마지막 날이 {sales['date']}이라 7일 합은 그날까지입니다")
+        sections.append({"title": "매출", "lines": lines})
+    res = out.get("promo_results")
+    if res and res["items"]:
+        lines = []
+        for i in res["items"]:
+            if i.get("growth") is None:
+                lines.append(f"{i['name']}: {i.get('note', '견줄 자료 없음')}")
+                continue
+            lines.append(f"{i['name']}({i['part']}, {i['start'][5:]}~{i['to'][5:]}): {i['sales_text']}, "
+                         f"앞 같은 요일 기간 대비 {i['growth']:+}%" + (", 확인 필요" if i["flag"] else ""))
+        sections.append({"title": "행사 성과", "lines": lines})
+    promos = out.get("promos")
+    if promos:
+        nxt = [i for i in promos["items"] if i["start"] > today.isoformat()]
+        lines = [f"{i['name']} {i['start'][5:]} 시작" + (f", {', '.join(i['warns'])}" if i["warns"] else "")
+                 for i in nxt]
+        sections.append({"title": "다음 7일 시작 행사", "lines": lines or ["없음"]})
+    if field_log is not None:
+        week = []
+        for r in field_log:
+            d = I.to_date(r["날짜"], r, "날짜")
+            if start <= d <= end:
+                week.append((d, str(r["접점"] or "").strip(), str(r.get("결과") or "정상").strip(), r.get("메모") or ""))
+        week.sort()
+        cnt = collections.Counter(x[2] for x in week)
+        lines = [f"현장 기록 {len(week)}건" + (f"({', '.join(f'{k} {n}건' for k, n in cnt.most_common())})" if week else "")]
+        lines += [f"{d.isoformat()[5:]} {p}: {res_}" + (f", {m}" if m else "") for d, p, res_, m in week
+                  if res_ != "정상"]
+        sections.append({"title": "현장 조치", "lines": lines})
+    touch = out.get("touch")
+    if touch and touch["week"]:
+        lines = [f"{x['place']} {x['metric']} {x['this_week']:,.0f}"
+                 + (f"(앞 7일 대비 {x['change_pct']:+}%)" if x["change_pct"] is not None else "")
+                 for x in sorted(touch["week"], key=lambda x: (x["place"], x["metric"]))]
+        sections.append({"title": "접점 숫자 7일 합" + v, "lines": lines})
+    review = out.get("review")
+    if review and not review.get("stale"):
+        sections.append({"title": "앱 리뷰", "lines": [f"지난 7일 1~2점 {review['low_7d']}건, 막힘 {review['blocked_7d']}건"]})
+    pilot = out.get("pilot")
+    if pilot:
+        sections.append({"title": "시범" + ("(가상)" if pilot.get("virtual") else ""),
+                         "lines": [f"{pilot.get('week_label', '')}: {pilot['decision']}"]})
+    return {"rule": "주간 정리", "from": start.isoformat(), "to": end.isoformat(), "sections": sections,
+            "source": "오늘 판단 결과와 현장 기록(field_log). 주간 보고 초안이며 문장은 담당자가 다듬습니다"}
