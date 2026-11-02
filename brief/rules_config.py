@@ -19,6 +19,10 @@ BENEFIT = "매장에서 혜택 사용"
 APP_BLOCK = TOPICS["로그인/본인인증"] + "|" + TOPICS["앱 실행 오류"]
 
 
+class ConfigError(ValueError):
+    pass
+
+
 def _merge(base, over):
     out = dict(base)
     for k, v in over.items():
@@ -40,7 +44,10 @@ def load(paths=None):
     cfg = {}
     for p in paths or config_paths():
         with open(p, "rb") as f:
-            cfg = _merge(cfg, tomllib.load(f))
+            try:
+                cfg = _merge(cfg, tomllib.load(f))
+            except tomllib.TOMLDecodeError as e:
+                raise ConfigError(f"{Path(p).name} 형식 오류: {e}") from None
     g = globals()
     g["CFG"] = cfg
     run = cfg["run"]
@@ -80,7 +87,8 @@ def load(paths=None):
     missing = [n for n in list(TOUCHPOINT_WORDS) + [f.get(k) for k in
                ("weekday_place", "sunday_place", "rain_holiday_place", "alert_place")] if n and n not in FIELD_CHECKS]
     if missing:
-        raise ValueError(f"설정 [field] 에 점검 질문이 없는 접점: {missing}. touchpoints 에 추가해 주세요")
+        raise ConfigError(f"[field] touchpoints 에 없는 접점: {', '.join(dict.fromkeys(missing))}. "
+                          "config.local.toml 에 touchpoints 를 적을 때는 config.toml 의 목록 전체를 복사한 뒤 더해 주세요")
     return cfg
 
 
@@ -99,4 +107,7 @@ def holiday_name(day):
     return _KR.get(day)
 
 
-load()
+try:
+    load()
+except ConfigError as e:  # 실행 창과 run.log 에 한 줄로 남긴다
+    raise SystemExit(f"설정 오류: {e}") from None

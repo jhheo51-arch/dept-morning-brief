@@ -120,13 +120,31 @@ def test_field_log_open_issue_then_overdue(tmp_path):
     assert "35일째" in f["items"][1]["why"]
 
 
-def test_field_log_unknown_place(tmp_path):
-    write_csv(tmp_path, "field_log", ["날짜", "접점"], [["2026-11-04", "옥상 정원"]])
-    with pytest.raises(I.InputError, match="옥상 정원"):
-        judge.rule_field(None, None, I.read_table("field_log", tmp_path), TODAY)
+def test_field_log_unknown_place_is_skipped(tmp_path):
+    write_csv(tmp_path, "field_log", ["날짜", "접점", "결과"], [
+        ["2026-11-04", "옥상 정원", "문제"], ["2026-11-04", "고객 상담실", "문제"]])
+    f = judge.rule_field(None, None, I.read_table("field_log", tmp_path), TODAY)
+    assert f["items"][0]["place"] == "고객 상담실"
+    assert len(f["skipped"]) == 1 and "field_log.csv 2행" in f["skipped"][0] and "옥상 정원" in f["skipped"][0]
+
+
+def test_csv_saved_by_korean_excel(tmp_path):
+    (tmp_path / "field_log.csv").write_bytes("날짜,접점,결과\n2026-11-04,문화센터,문제\n".encode("cp949"))
+    assert I.read_table("field_log", tmp_path)[0]["접점"] == "문화센터"
 
 
 # 설정
+def test_partial_touchpoints_gives_clear_error(tmp_path):
+    local = tmp_path / "local.toml"
+    local.write_text('[field]\ntouchpoints = [ { name = "VIP 주차장", every_days = 7, check = "x" } ]\n',
+                     encoding="utf-8")
+    with pytest.raises(C.ConfigError, match="목록 전체를 복사"):
+        C.load([C.ROOT / "config.toml", local])
+    local.write_text("[sales\n", encoding="utf-8")
+    with pytest.raises(C.ConfigError, match="local.toml 형식 오류"):
+        C.load([C.ROOT / "config.toml", local])
+
+
 def test_local_config_overrides(tmp_path):
     real_mode(tmp_path, '[calendar]\nextra_holidays = { "2026-11-05" = "정기 휴점" }\n')
     assert C.MODE == "real" and not C.ALLOW_LLM and C.APP_ID == ""

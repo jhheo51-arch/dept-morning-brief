@@ -364,14 +364,14 @@ def rule_pilot(today, sim=None, weekly=None):
 
 
 # 4.4 오늘 현장 점검 목록
-def _last_visits(log, today):
-    """접점별 마지막 방문일과 그때 결과."""
+def _last_visits(log, today, skipped):
+    """접점별 마지막 방문일과 그때 결과. 설정에 없는 접점 줄은 건너뛰고 skipped 에 적는다."""
     last = {}
     for r in log or []:
         place = str(r["접점"] or "").strip()
         if place not in C.FIELD_CHECKS:
-            raise I.InputError(f"{I.where(r)} 접점 '{place}'이 설정에 없습니다. 쓸 수 있는 이름: "
-                               f"{', '.join(C.FIELD_CHECKS)}")
+            skipped.append(f"{I.where(r)} 접점 '{place}': 설정에 없어 건너뜀")
+            continue
         d = I.to_date(r["날짜"], r, "날짜")
         if d > today:
             continue
@@ -387,13 +387,14 @@ def rule_field(review, calendar, log=None, today=None):
         if place and place in C.FIELD_CHECKS and not any(i["place"] == place for i in items):
             items.append({"place": place, "check": C.FIELD_CHECKS[place], "why": why})
 
-    last = _last_visits(log, today) if log is not None and today else {}
+    skipped = []
+    last = _last_visits(log, today, skipped) if log is not None and today else {}
     if review:
         for place, n in list(review.get("places_7d", {}).items())[:2]:
             add(place, f"지난 7일 막힘 리뷰 {n}건에 관련 단어")
     for place, x in sorted(last.items(), key=lambda kv: kv[1]["date"]):
         if x["result"] in ("문제", "해결 중"):
-            add(place, f"{x['date'].isoformat()} 방문 때 '{x['result']}'로 남김, 다시 확인")
+            add(place, f"{x['date'].isoformat()} 방문 때 결과 '{x['result']}', 다시 확인")
     f = C.FIELD
     if calendar:
         t = calendar["days"][0]
@@ -422,6 +423,6 @@ def rule_field(review, calendar, log=None, today=None):
     if not items:
         add(f.get("alert_place"), "기본 점검")
     return {"rule": "4.4 오늘 현장 점검 목록", "items": items[:f.get("max_items", 3)],
-            "logged": log is not None,
+            "logged": log is not None, "skipped": skipped,
             "last_visits": {k: {"date": v["date"].isoformat(), "result": v["result"]} for k, v in last.items()},
             "source": "리뷰와 달력 결과, 현장 기록(field_log), 점검 질문은 설정 파일의 고정 목록"}

@@ -1,9 +1,10 @@
-"""내 업무 파일 읽기. 엑셀(.xlsx, 첫 시트)이나 CSV(UTF-8)를 받는다.
+"""내 업무 파일 읽기. 엑셀(.xlsx, 첫 시트)이나 CSV(UTF-8 또는 엑셀 기본 cp949)를 받는다.
 
 파일이 없으면 None 을 돌려 그 블록을 건너뛰고, 형식이 틀리면 파일 이름과 행 번호를 담은 InputError 를 낸다.
 """
 import csv
 import datetime as dt
+import io
 import re
 
 from . import rules_config as C
@@ -46,8 +47,12 @@ def _cells(p):
         import openpyxl
         ws = openpyxl.load_workbook(p, read_only=True, data_only=True).worksheets[0]
         return [list(r) for r in ws.iter_rows(values_only=True)]
-    with open(p, encoding="utf-8-sig", newline="") as f:  # 엑셀에서 'CSV UTF-8'로 저장한 파일
-        return list(csv.reader(f))
+    raw = p.read_bytes()
+    try:
+        text = raw.decode("utf-8-sig")  # 엑셀 'CSV UTF-8'
+    except UnicodeDecodeError:
+        text = raw.decode("cp949")  # 한국어 엑셀 기본 'CSV(쉼표로 분리)'
+    return list(csv.reader(io.StringIO(text, newline="")))
 
 
 def read_table(name, folder=None):
@@ -58,7 +63,7 @@ def read_table(name, folder=None):
     try:
         cells = _cells(p)
     except UnicodeDecodeError:
-        raise InputError(f"{p.name}: 글자가 깨집니다. 엑셀에서 'CSV UTF-8' 형식으로 다시 저장해 주세요") from None
+        raise InputError(f"{p.name}: 글자가 깨집니다. 엑셀에서 'CSV UTF-8'이나 '엑셀 통합 문서(xlsx)'로 다시 저장해 주세요") from None
     if not cells:
         raise InputError(f"{p.name}: 빈 파일입니다")
     head = [str(h).strip() if h is not None else "" for h in cells[0]]

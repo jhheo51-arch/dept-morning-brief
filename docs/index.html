@@ -223,6 +223,7 @@ footer{font-size:13px; color:var(--muted); text-align:center; margin-top:24px}
     var lv=f.last_visits||{}, names=Object.keys(lv);
     if(names.length) h+='<p class="sub" style="margin-top:10px">마지막 방문 기록'+(SAMPLE?'(가상)':'')+': '+names.map(function(n){return esc(n)+' '+esc(lv[n].date.slice(5).replace('-','/'))+(lv[n].result&&lv[n].result!=='정상'?'('+esc(lv[n].result)+')':'')}).join(', ')+'</p>';
     else if(!f.logged) h+=missing('field_log','현장 기록');
+    if((f.skipped||[]).length) h+='<p class="sub warnline">'+f.skipped.map(esc).join('<br>')+'. 접점 이름은 설정의 touchpoints 와 같게 적습니다.</p>';
     h+=src(f.rule, f.source+'. 갈 곳과 볼 것을 정하는 목록이며, 다녀온 뒤 field_log에 한 줄 적으면 다음 날 주기 판단에 들어감');
   }
   $('c44').innerHTML=h;
