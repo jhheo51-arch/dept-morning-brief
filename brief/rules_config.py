@@ -1,7 +1,13 @@
-"""판단 규칙에 쓰는 고정값. 숫자는 포트폴리오에서 낸 집계 상수이거나 '가정값', '설정값(가상)'으로 표시한다."""
-import datetime as dt
+"""판단 규칙에 쓰는 값. config.toml 을 읽고, config.local.toml 이 있으면 그 값으로 덮는다.
 
-APP_ID = "com.ehyundai.mcard"  # 현대백화점 앱, Google Play
+리뷰 주제 단어 규칙만 코드에 고정한다(포트폴리오 5쪽과 같은 규칙). 나머지는 설정 파일에서 바꾼다.
+"""
+import datetime as dt
+import os
+import tomllib
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parent.parent
 
 # 포트폴리오 5쪽과 같은 단어 규칙(현대백화점-apply/analysis/review_topics.py 의 TOPICS)
 TOPICS = {
@@ -12,57 +18,85 @@ TOPICS = {
 BENEFIT = "매장에서 혜택 사용"
 APP_BLOCK = TOPICS["로그인/본인인증"] + "|" + TOPICS["앱 실행 오류"]
 
-# 막힌 리뷰에 나온 혜택 단어로 현장 접점을 고른다(4.4). 리뷰에는 접점 이름만 남긴다
-TOUCHPOINT_WORDS = {
-    "주차 정산기": r"주차|정산",
-    "라운지 입구": r"라운지|입장",
-    "웨이팅 접수대": r"웨이팅|대기",
-    "문화센터 안내 데스크": r"문화센터|문센",
-    "계산대": r"쿠폰|카드|결제|할인|적립|포인트|영수증",
-}
 
-# 4.4 점검 질문 고정 목록. 이 목록 밖의 문장은 만들지 않는다
-FIELD_CHECKS = {
-    "주차 정산기": "앱 바코드 없이 정산하는 방법 안내가 있는가",
-    "라운지 입구": "앱이 안 열릴 때 회원 확인을 받는 다른 방법이 안내되어 있는가",
-    "웨이팅 접수대": "앱 없이 대기 등록하는 방법이 보이는가",
-    "문화센터 안내 데스크": "앱 로그인 없이 수강 확인을 받는 방법이 있는가",
-    "계산대": "앱 쿠폰이 안 열릴 때 직원이 휴대폰 번호로 혜택을 조회할 수 있는가",
-    "고객센터": "앱이 안 열려도 휴대폰 번호로 혜택을 받는 길이 안내되어 있는가",
-    "문화센터": "당일 남은 자리 안내가 보이는가",
-    "지하 연결 입구": "여의도역에서 들어오는 퇴근 동선에 저녁 혜택 안내물이 보이는가",
-    "팝업 행사장": "행사 마지막 날과 사은행사 마감 안내가 입구에서 보이는가",
-}
+def _merge(base, over):
+    out = dict(base)
+    for k, v in over.items():
+        out[k] = _merge(out[k], v) if isinstance(v, dict) and isinstance(out.get(k), dict) else v
+    return out
 
-# 4.2 판단에 쓰는 포트폴리오 4쪽 집계 상수(서울교통공사 OA-12921 집계, 원자료는 저장소에 없음)
-WEEKDAY_EVENING_BOARD = 16483  # 평일 17~20시 5호선 여의도역 승차
-SAT_ALIGHT = 31905             # 휴일 하차 중앙값, 토요일
-SUN_ALIGHT = 22602             # 휴일 하차 중앙값, 일요일(토요일보다 29% 적음)
-SUN_VS_SAT = -29               # %
-RAIN_HOLIDAY_RATIO = 1.02      # 비 온 휴일 여의도역 하차, 같은 달 휴일 중앙값 대비
-RAIN_MM = 3                    # 낮(10~20시) 강수 합이 이 값 이상이면 비 온 날(포트폴리오 4쪽과 같은 정의)
 
-# Open-Meteo 예보 좌표(여의도역 근처)
-LAT, LON = 37.5216, 126.9242
+def config_paths():
+    """BRIEF_CONFIG 가 있으면 그 파일을, 없으면 config.local.toml 을 기본 설정 위에 덮는다."""
+    paths = [ROOT / "config.toml"]
+    local = Path(os.environ["BRIEF_CONFIG"]) if os.environ.get("BRIEF_CONFIG") else ROOT / "config.local.toml"
+    if local.exists():
+        paths.append(local)
+    return paths
 
-# 평일에 걸린 공휴일(인사혁신처 기준, 대체공휴일 포함). 2027-01-01 이후는 갱신 필요
-HOLIDAYS = {
-    "2026-10-05": "개천절 대체공휴일", "2026-10-09": "한글날", "2026-12-25": "성탄절", "2027-01-01": "신정",
-}
 
-# 4.2 알릴 길 후보. 실제 운영 채널인지는 확인하지 않았다
-CHANNELS = ["앱 푸시", "문자나 메신저 알림", "매장 안내물(사이니지, VMD)", "문화센터 공지"]
-CHANNEL_NOTE = "후보, 운영 여부 확인 필요"
+def load(paths=None):
+    """설정을 읽어 이 모듈의 값을 바꾼다. 다른 모듈은 C.이름 으로 실행 시점 값을 읽는다."""
+    cfg = {}
+    for p in paths or config_paths():
+        with open(p, "rb") as f:
+            cfg = _merge(cfg, tomllib.load(f))
+    g = globals()
+    g["CFG"] = cfg
+    run = cfg["run"]
+    g["MODE"] = run.get("mode", "sample")
+    g["SAMPLE"] = MODE == "sample"
+    g["STORE_NAME"] = run.get("store_name", "")
+    g["ALLOW_LLM"] = run.get("allow_llm", SAMPLE)
+    g["WEBHOOK_ENV"] = run.get("webhook_env", "")
+    g["REPO_URL"] = run.get("repo_url", "")
+    # 시연은 docs/ 와 data/ 에 쓰고(공개), 내 데이터는 output/ 에만 쓴다(.gitignore)
+    g["INPUT_DIR"] = ROOT / ("samples" if SAMPLE else run.get("input_dir", "inputs"))
+    g["SITE_DIR"] = ROOT / ("docs" if SAMPLE else run.get("output_dir", "output") + "/site")
+    g["DATA_DIR"] = ROOT / ("data" if SAMPLE else run.get("output_dir", "output") + "/data")
 
-# 포트폴리오 6쪽 시범
-PILOTS = {
-    1: "평일 17~20시 퇴근길",
-    2: "일요일, 비 예보엔 먼저",
-    3: "부르기 전에, 막히는 곳부터",
-}
+    rv = cfg["reviews"]
+    g["APP_ID"], g["APP_NAME"] = rv.get("app_id", ""), rv.get("app_name", "앱")
+    g["ALERT_MULTIPLE"], g["ALERT_BLOCKED"] = rv.get("alert_multiple", 2.0), rv.get("alert_blocked", 1)
 
-# 4.3 시범 점검(가상). 시작일은 가정값
-PILOT_START = dt.date(2026, 10, 12)
-PILOT_WEEKS = 10
-CHECK_WEEKS = (4, 10)
-BREAKEVEN = 0.25  # 본전: 혜택 1건 5,000원 / 새 방문 1회 2만 원(세 숫자 모두 가정값, 포트폴리오 7쪽)
+    w = cfg["weather"]
+    g["LAT"], g["LON"], g["RAIN_MM"] = w["lat"], w["lon"], w.get("rain_mm", 3)
+
+    g["CAL"] = cfg["calendar"]
+    g["CHANNELS"], g["CHANNEL_NOTE"] = CAL["channels"], CAL.get("channel_note", "")
+    g["PILOTS"] = {int(k): v for k, v in cfg["pilots"].items()}
+    g["SALES"], g["PROMO"] = cfg["sales"], cfg["promotions"]
+
+    p = cfg["pilot"]
+    g["PILOT_START"] = p["start"] if isinstance(p["start"], dt.date) else dt.date.fromisoformat(p["start"])
+    g["PILOT_WEEKS"], g["CHECK_WEEKS"] = p["weeks"], tuple(p["check_weeks"])
+    g["BREAKEVEN"] = p["breakeven_pct"] / 100
+
+    f = cfg["field"]
+    g["FIELD"] = f
+    # 점검 질문 고정 목록. 이 목록 밖의 문장은 만들지 않는다
+    g["FIELD_CHECKS"] = {t["name"]: t["check"] for t in f["touchpoints"]}
+    g["TOUCHPOINT_WORDS"] = f.get("review_words", {})
+    missing = [n for n in list(TOUCHPOINT_WORDS) + [f.get(k) for k in
+               ("weekday_place", "sunday_place", "rain_holiday_place", "alert_place")] if n and n not in FIELD_CHECKS]
+    if missing:
+        raise ValueError(f"설정 [field] 에 점검 질문이 없는 접점: {missing}. touchpoints 에 추가해 주세요")
+    return cfg
+
+
+_KR = None
+
+
+def holiday_name(day):
+    """대한민국 공휴일(holidays 라이브러리)과 설정의 extra_holidays. 공휴일이 아니면 None."""
+    global _KR
+    extra = CAL.get("extra_holidays", {})
+    if day.isoformat() in extra:
+        return extra[day.isoformat()]
+    if _KR is None:
+        import holidays
+        _KR = holidays.KR(language="ko")
+    return _KR.get(day)
+
+
+load()

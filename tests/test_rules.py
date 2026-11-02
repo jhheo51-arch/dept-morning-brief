@@ -73,7 +73,8 @@ def test_calendar_rainy_weekend_and_no_forecast():
 
 def test_calendar_weekday_holiday():
     c = judge.rule_calendar(dt.date(2026, 12, 25), {}, False)
-    assert c["days"][0]["holiday"] and "성탄절" in c["days"][0]["situation"]
+    assert c["days"][0]["holiday"] and "기독탄신일" in c["days"][0]["situation"]  # holidays 라이브러리 이름
+    assert c["days"][0]["pilots"] == [2]  # 평일 공휴일은 일요일처럼 본다
 
 
 # 4.3

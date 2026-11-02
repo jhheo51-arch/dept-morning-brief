@@ -2,3 +2,9 @@ __pycache__/
 .pytest_cache/
 .venv/
 *.pyc
+
+# 내 업무 자료와 결과는 저장소에 올리지 않는다
+config.local.toml
+inputs/
+output/
+samples/

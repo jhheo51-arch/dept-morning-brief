@@ -1,0 +1,89 @@
+# 아침 점검 설정. 이 파일은 공개 시연용 기본값입니다.
+# 내 업무에 쓸 때는 `python -m brief.init` 으로 config.local.toml 을 만들어 그 파일만 고칩니다.
+# config.local.toml 과 inputs/, output/ 은 .gitignore 에 들어 있어 저장소에 올라가지 않습니다.
+
+[run]
+# sample: 가상 매출, 가상 행사, 가상 시범으로 화면을 만들고 docs/ 와 data/ 에 씁니다(공개 시연).
+# real: inputs/ 폴더의 내 파일을 읽고 output/ 폴더에만 씁니다.
+mode = "sample"
+store_name = "더현대 서울(시연)"
+# Claude 요약(allow_llm). 적지 않으면 sample 모드는 켜짐, real 모드는 꺼짐입니다.
+# real 모드에서 켜면 매출 같은 내부 숫자가 외부 API로 나가므로 config.local.toml 에서만 켭니다.
+# 알림 웹훅 주소를 담은 환경변수 이름(Slack, Teams 수신 웹훅). 비어 있으면 보내지 않습니다.
+webhook_env = "BRIEF_WEBHOOK_URL"
+# 화면 맨 아래 저장소 링크. 비우면 표시하지 않습니다.
+repo_url = "https://github.com/jhheo51-arch/dept-morning-brief"
+
+[reviews]
+# Google Play 앱 ID. 비우면 리뷰 블록을 건너뜁니다.
+app_id = "com.ehyundai.mcard"
+app_name = "현대백화점 앱"
+alert_multiple = 2.0      # 새 1~2점이 지난 4주 하루 평균의 몇 배를 넘으면 확인 필요
+alert_blocked = 1         # 막힘 리뷰가 몇 건 이상이면 확인 필요
+
+[weather]
+lat = 37.5216             # 점포 좌표(Open-Meteo 예보)
+lon = 126.9242
+rain_mm = 3               # 낮(10~20시) 강수 합이 이 값 이상이면 비 오는 날
+
+[calendar]
+# 요일별 판단 근거 문장. 내 점포 숫자가 있으면 바꿔 씁니다.
+weekday_basis = "평일 17~20시 여의도역 승차 16,483명(포트폴리오 4쪽 집계)"
+saturday_basis = "토요일 하차 31,905명으로 휴일 중 가장 많아 따로 부르지 않음"
+sunday_basis = "일요일 하차 22,602명, 토요일보다 29% 적음"
+rain_holiday_basis = "비 온 휴일 여의도역 하차 1.02배(같은 달 휴일 중앙값 대비)"
+weekday_time = "당일 17시"
+sunday_time = "전날 18시"
+weekday_benefit = "식품관 저녁 혜택, 문화센터 저녁 클래스"
+saturday_benefit = "브랜드 할인"
+sunday_benefit = "팝업 마지막 날, 사은행사 마감"
+rain_benefit = "실내 행사, 문화센터 원데이 클래스"
+channels = ["앱 푸시", "문자나 메신저 알림", "매장 안내물(사이니지, VMD)", "문화센터 공지"]
+channel_note = "후보, 운영 여부 확인 필요"
+# 공휴일은 holidays 라이브러리(대한민국)로 자동 계산합니다. 점포 휴점일이나 지역 행사일은 여기에 더합니다.
+extra_holidays = {}
+
+[pilots]
+1 = "평일 17~20시 퇴근길"
+2 = "일요일, 비 예보엔 먼저"
+3 = "부르기 전에, 막히는 곳부터"
+
+[sales]
+# inputs/sales 파일의 매출 판단 기준
+yoy_alert_pct = -10       # 전년 같은 요일 대비 이 % 이하이면 확인 필요
+target_alert_pct = 90     # 목표 달성률이 이 % 미만이면 확인 필요
+total_name = "전체"       # 파일에 이 구분이 없으면 나머지 구분을 더해 만듭니다
+
+[promotions]
+lookahead_days = 7        # 며칠 뒤 시작하는 행사까지 볼지
+vmd_ready_days = 3        # 시작 며칠 전까지 VMD 협의가 끝나야 하는지
+done_words = ["완료", "확정", "설치 완료"]
+
+[pilot]
+# 시범 결과 파일(inputs/pilot_weekly)이 없으면 가상 시범으로 계산합니다.
+start = 2026-10-12        # 가정값
+weeks = 10
+check_weeks = [4, 10]
+breakeven_pct = 25        # 본전: 혜택 1건 5,000원 / 새 방문 1회 2만 원(가정값)
+
+[field]
+max_items = 3
+# 정기 점검 접점. every_days 일 넘게 현장 기록이 없으면 목록에 올립니다.
+touchpoints = [
+  { name = "우수고객 라운지", every_days = 7, check = "앱이 안 열릴 때 회원 확인을 받는 다른 방법이 안내되어 있는가" },
+  { name = "문화센터", every_days = 7, check = "당일 남은 자리 안내가 보이는가" },
+  { name = "고객 상담실", every_days = 7, check = "최근 늘어난 문의 유형이 있는가, 앱 혜택 문의가 몇 건인가" },
+  { name = "고객센터", every_days = 14, check = "앱이 안 열려도 휴대폰 번호로 혜택을 받는 길이 안내되어 있는가" },
+  { name = "주차 정산기", every_days = 14, check = "앱 바코드 없이 정산하는 방법 안내가 있는가" },
+  { name = "웨이팅 접수대", every_days = 14, check = "앱 없이 대기 등록하는 방법이 보이는가" },
+  { name = "계산대", every_days = 14, check = "앱 쿠폰이 안 열릴 때 직원이 휴대폰 번호로 혜택을 조회할 수 있는가" },
+  { name = "지하 연결 입구", every_days = 14, check = "여의도역에서 들어오는 퇴근 동선에 저녁 혜택 안내물이 보이는가" },
+  { name = "팝업 행사장", every_days = 7, check = "행사 마지막 날과 사은행사 마감 안내가 입구에서 보이는가" },
+]
+# 막힘 리뷰에 나온 단어로 접점을 고릅니다(이름은 위 touchpoints 와 같아야 함)
+review_words = { "주차 정산기" = "주차|정산", "우수고객 라운지" = "라운지|입장", "웨이팅 접수대" = "웨이팅|대기", "문화센터" = "문화센터|문센", "계산대" = "쿠폰|카드|결제|할인|적립|포인트|영수증" }
+# 오늘 상황에 따라 올릴 접점
+weekday_place = "지하 연결 입구"
+sunday_place = "팝업 행사장"
+rain_holiday_place = "문화센터"
+alert_place = "고객센터"

@@ -14,41 +14,77 @@ def _pilot_names(nums):
     return ", ".join(f"{n}번 {C.PILOTS[n]}" for n in nums)
 
 
-def top_three(review, calendar, pilot, field):
-    out = []
+def _v():
+    return "(가상)" if C.SAMPLE else ""
+
+
+def _sales_line(s):
+    t = s["total"]
+    bits = [f"{s['date'][5:].replace('-', '/')} 매출{_v()} {t['sales_text']}"]
+    if t["achieve_pct"] is not None:
+        bits.append(f"목표 {t['achieve_pct']}%")
+    if t["yoy_pct"] is not None:
+        bits.append(f"전년 대비 {t['yoy_pct']:+}%")
+    return ", ".join(bits)
+
+
+def top_three(out):
+    """확인 필요 항목을 먼저, 그다음 오늘 할 일. 최대 세 줄."""
+    sales, promos, review, calendar, pilot, field = (out.get(k) for k in
+                                                     ("sales", "promos", "review", "calendar", "pilot", "field"))
+    urgent, usual = [], []
+    if sales:
+        line = f"매출 {sales['status']}: {_sales_line(sales)}"
+        if sales["parts_flagged"]:
+            line += f". 볼 구분 {', '.join(sales['parts_flagged'][:3])}"
+        (urgent if sales["status"] == "확인 필요" else usual).append(line)
+    if promos:
+        warned = [i for i in promos["items"] if i["warns"]]
+        if warned:
+            i = warned[0]
+            more = f" 외 {len(warned) - 1}건" if len(warned) > 1 else ""
+            urgent.append(f"행사 {i['name']}: {', '.join(i['warns'])}{more}")
+        elif promos["items"]:
+            usual.append(f"행사 진행 {promos['running']}건, 7일 안 시작 {promos['upcoming']}건, 경고 없음")
     if review:
-        out.append(f"앱 리뷰 {review['status']}: 새 1~2점 {review['low_new']}건, 막힘 {review['blocked_new']}건"
-                   f"(지난 7일 1~2점 {review['low_7d']}건)")
+        line = (f"앱 리뷰 {review['status']}: 새 1~2점 {review['low_new']}건, 막힘 {review['blocked_new']}건"
+                f"(지난 7일 1~2점 {review['low_7d']}건)")
+        (urgent if review["status"] == "확인 필요" else usual).append(line)
     if calendar:
         t = calendar["days"][0]
-        what = f"{_pilot_names(t['pilots'])}, {', '.join(t['times'])} {', '.join(t['channels'])}" \
-            if t["pilots"] and t["channels"] else (_pilot_names(t["pilots"]) or "맞는 시범 없음")
-        out.append(f"오늘({', '.join(t['situation'])}) {what}")
+        what = f"{_pilot_names(t['pilots'])}, {', '.join(t['times'])} {', '.join(t['channels'])}"             if t["pilots"] and t["channels"] else (_pilot_names(t["pilots"]) or "맞는 시범 없음")
+        usual.append(f"오늘({', '.join(t['situation'])}) {what}")
     if pilot and pilot.get("check_day"):
-        out.append(f"시범 {pilot['week_label']}: {pilot['decision']}(가상 데이터)")
-    elif field and field["items"]:
+        urgent.append(f"시범 {pilot['week_label']}: {pilot['decision']}" + ("(가상 데이터)" if pilot["virtual"] else ""))
+    if field and field["items"]:
         i = field["items"][0]
-        out.append(f"현장 {i['place']}: {i['check']}")
-    return out[:3]
+        usual.append(f"현장 {i['place']}: {i['check']}")
+    return (urgent + usual)[:3]
 
 
-def template_summary(review, calendar, pilot):
+def template_summary(out):
+    sales, promos, review, calendar, pilot = (out.get(k) for k in ("sales", "promos", "review", "calendar", "pilot"))
     s = []
+    if sales:
+        s.append(f"{_sales_line(sales)}로 {sales['status']}입니다.")
+    if promos and promos["warn_count"]:
+        s.append(f"행사 {len(promos['items'])}건 중 {promos['warn_count']}건에 경고가 있습니다.")
     if review:
         t = review.get("totals30")
         s.append(f"앱 리뷰는 {review['status']}입니다. 새 1~2점은 {review['low_new']}건, 막힘은 "
                  f"{review['blocked_new']}건이고 "
                  + (f"최근 30일 1~2점은 {t['low']}건, 막힘은 {t['blocked']}건입니다." if t
                     else f"지난 7일 합계는 {review['low_7d']}건입니다."))
-    else:
+    elif C.APP_ID:
         s.append("앱 리뷰는 수집하지 못해 판단을 건너뜁니다.")
     if calendar:
         t = calendar["days"][0]
         s.append(f"오늘은 {', '.join(t['situation'])}이라 "
                  + (f"{_pilot_names(t['pilots'])}에 맞춰 봅니다." if t["pilots"] else "따로 부를 시범이 없습니다."))
     if pilot:
-        s.append(f"가상 시범은 {pilot['week_label']} 기준이고 판단은 {pilot['decision']}입니다."
-                 if pilot.get("weeks_done", 0) > 0 else "가상 시범은 아직 집계 전입니다.")
+        who = "가상 시범" if pilot.get("virtual") else "시범"
+        s.append(f"{who}은 {pilot['week_label']} 기준이고 판단은 {pilot['decision']}입니다."
+                 if pilot.get("weeks_done", 0) > 0 else f"{who}은 아직 집계 전입니다.")
     return " ".join(s)
 
 
@@ -73,7 +109,7 @@ def llm_summary(judgment, client=None):
         import anthropic
         client = anthropic.Anthropic()
     prompt = ("아래 JSON은 백화점 마케팅 담당자의 아침 점검 판단 결과입니다. 한국어 3문장으로 요약하세요. "
-              "JSON에 없는 숫자는 쓰지 마세요. 판단을 바꾸지 마세요. 가상 데이터는 가상이라고 밝히세요. "
+              "JSON에 없는 숫자는 쓰지 마세요. 확인 필요 항목을 먼저 쓰세요. 판단을 바꾸지 마세요. 가상 데이터는 가상이라고 밝히세요. "
               "가운데 점과 화살표 기호는 쓰지 마세요. 요약 문장만 답하세요.\n\n"
               + json.dumps(judgment, ensure_ascii=False))
     try:
@@ -90,7 +126,11 @@ def brief_markdown(b):
     lines += [f"{i}. {t}" for i, t in enumerate(b["top3"], 1)]
     lines += ["", "## 요약", b["summary"], ""]
     if b["failures"]:
-        lines += [f"수집 실패: {', '.join(f['step'] for f in b['failures'])}. "
+        lines += [f"실패: {', '.join(f['step'] for f in b['failures'])}. "
                   "실패한 블록은 마지막 성공 결과를 보여 줍니다.", ""]
-    lines += ["공개 데이터와 가상 데이터만 씁니다. 현대백화점 내부 자료가 아닙니다.", ""]
+        lines += [f"- {f['message']}" for f in b["failures"] if f.get("message")]
+    if b.get("missing"):
+        lines += [f"아직 없는 파일: {', '.join(b['missing'])}(넣으면 그 블록이 나옵니다)", ""]
+    lines += ["공개 데이터와 가상 데이터만 씁니다. 현대백화점 내부 자료가 아닙니다." if b.get("mode", "sample") == "sample"
+              else "내 업무 파일로 만든 점검입니다. 외부에 공유하지 마세요.", ""]
     return "\n".join(lines)
