@@ -1,6 +1,6 @@
 {
  "date": "2026-11-02",
- "run_at": "2026-11-02T17:48+09:00",
+ "run_at": "2026-11-02T17:49+09:00",
  "mode": "sample",
  "store_name": "더현대 서울(시연)",
  "repo_url": "https://github.com/jhheo51-arch/dept-morning-brief",
@@ -371,7 +371,7 @@
  "review": {
   "rule": "4.1 고객 접점 알림",
   "app_name": "현대백화점 앱",
-  "since": "2026-11-02 17:28",
+  "since": "2026-11-02 17:48",
   "span_days": 1,
   "low_new": 0,
   "topics_new": {
