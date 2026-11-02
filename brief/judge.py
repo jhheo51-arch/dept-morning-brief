@@ -646,3 +646,40 @@ def consult_drafts(today, out):
             "rule_text": "VMD 경고는 VMD 담당, 알릴 길과 마감 안내는 채널 담당, 성과가 낮은 행사는 둘 다, "
                          "구분 매출 경고는 그 구분 영업 담당, 접점 숫자 표시는 그 접점 담당, 리뷰 확인 필요는 앱 운영 담당",
             "source": "오늘 판단 결과. 요청 문장은 정해진 목록이며 보내기 전에 담당자가 다듬습니다"}
+
+
+def plan_drafts(today, out):
+    """이번 주 달력에서 시범별로 가장 가까운 날을 골라 집객 기획 초안을 만든다. 문장은 설정의 재료만 쓴다."""
+    cal = out.get("calendar") or {}
+    names = cal.get("pilot_names", {})
+    picked = {}
+    for row in cal.get("days", []):
+        for n in row["pilots"]:
+            if str(n) not in picked and str(n) in C.PLAN:
+                picked[str(n)] = row
+    pilot = out.get("pilot") or {}
+    low = [i for i in (out.get("promo_results") or {}).get("items", []) if i["flag"]]
+    v = "(가상)" if C.SAMPLE else ""
+    cards = []
+    for n, row in picked.items():
+        p = C.PLAN[n]
+        d = dt.date.fromisoformat(row["date"])
+        notes = []
+        if n == "1" and pilot.get("decision") and pilot["decision"] != "집계 전":
+            notes.append(f"진행 중인 시범{v} 신호는 {pilot['decision']}입니다. "
+                         + ("문구 B나 대상 조건을 바꾼 안을 함께 올립니다." if not pilot["decision"].startswith("넓힌다")
+                            else "대상을 넓힐 범위를 함께 정합니다."))
+        if low and n != "3":
+            notes.append(f"성과가 낮았던 행사: {', '.join(i['name'] for i in low)}. 같은 혜택을 되풀이하지 않습니다.")
+        cards.append({
+            "pilot": int(n), "name": names.get(n, ""),
+            "date": row["date"], "when": f"{d.month}/{d.day}({DOW[d.weekday()]}) " + ", ".join(row["times"]),
+            "situation": ", ".join(row["situation"]), "basis": row["basis"],
+            "target": p.get("target", ""), "benefit": row["benefit"], "channels": row["channels"],
+            "copy_a": p["copy_a_rain"] if row["rain"] and p.get("copy_a_rain") else p.get("copy_a", ""), "copy_b": p.get("copy_b", ""),
+            "measure": p.get("measure", ""), "owner": p.get("owner", ""), "notes": notes})
+    cards.sort(key=lambda c: (c["date"], c["pilot"]))
+    return {"rule": "집객 기획 초안", "cards": cards[:C.PLAN.get("max_cards", 3)],
+            "rule_text": "이번 주 달력에서 시범마다 가장 가까운 날 하나. 대상, 문구, 재는 법은 설정 문장, "
+                         "때와 혜택, 알릴 길은 달력 판단, 참고는 시범 신호와 성과가 낮은 행사",
+            "source": "이번 주 집객 달력, 시범 점검, 행사 성과. 무엇을 할지는 담당자가 정합니다"}

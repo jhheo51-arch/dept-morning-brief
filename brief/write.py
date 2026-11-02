@@ -171,3 +171,23 @@ def consult_markdown(b):
         lines += [f"## {d['to']}", "", d["text"], ""]
     lines += [f"묶는 규칙: {c['rule_text']}.", "보내기 전에 문장을 다듬고, 숫자는 원본 파일과 한 번 더 맞춰 봅니다.", ""]
     return "\n".join(lines)
+
+
+def plan_markdown(b):
+    p = b["plan"]
+    lines = [f"# 집객 기획 초안 {b['date']}", ""]
+    if not p["cards"]:
+        lines += ["이번 주 달력에 맞춰 볼 시범이 없습니다.", ""]
+    for c in p["cards"]:
+        lines += [f"## {c['pilot']}번 {c['name']} | {c['when']}", "",
+                  f"- 왜 이날: {c['situation']}. {c['basis']}",
+                  f"- 누구에게: {c['target']}",
+                  f"- 무엇을: {c['benefit']}",
+                  f"- 알릴 길: {', '.join(c['channels'])}",
+                  f"- 문구 A: {c['copy_a']}",
+                  f"- 문구 B: {c['copy_b']}",
+                  f"- 재는 법: {c['measure']}",
+                  f"- 맡을 곳: {c['owner']}"]
+        lines += [f"- 참고: {x}" for x in c["notes"]] + [""]
+    lines += [f"고르는 규칙: {p['rule_text']}.", "초안입니다. 무엇을 할지는 담당자가 정합니다.", ""]
+    return "\n".join(lines)

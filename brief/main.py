@@ -16,7 +16,7 @@ ROOT = C.ROOT
 BLOCKS = {"review": "리뷰 수집", "calendar": "날씨 예보 수집", "pilot": "시범 계산", "field": "현장 목록 판단",
           "sales": "매출 파일 읽기", "promos": "행사 파일 읽기", "promo_results": "행사 성과 계산",
           "touch": "접점 숫자 파일 읽기", "weekly": "주간 정리",
-         "consult": "협의 초안"}
+         "consult": "협의 초안", "plan": "기획 초안"}
 FILES = {"sales": "sales", "promos": "promotions", "pilot": "pilot_weekly", "field": "field_log",
          "touch": "touchpoint_daily"}
 
@@ -100,7 +100,7 @@ def run(now=None, root=ROOT, review_fetch=None, weather_fetch=None, summarizer=N
             out["promo_results"] = fallback("promo_results", e)
 
     # 4.1
-    if C.APP_ID:
+    if C.APP_ID and not C.OFFLINE:
         try:
             rows, texts = review_fetch(now)
             since = dt.datetime.fromisoformat(prev["run_at"]) if prev.get("run_at") else now - dt.timedelta(days=1)
@@ -115,7 +115,7 @@ def run(now=None, root=ROOT, review_fetch=None, weather_fetch=None, summarizer=N
 
     # 4.2 예보가 없어도 요일과 공휴일로 달력을 만든다
     try:
-        weather = weather_fetch(today)
+        weather = None if C.OFFLINE else weather_fetch(today)
         last_ok["calendar"] = today.isoformat()
     except Exception as e:  # noqa: BLE001
         fallback("calendar", e)
@@ -149,7 +149,7 @@ def run(now=None, root=ROOT, review_fetch=None, weather_fetch=None, summarizer=N
             for k, v in judgment.items()}
     if summarizer is None:
         # 내 데이터 모드에서는 allow_llm 을 켠 경우에만 판단 결과가 외부 API로 나간다
-        summarizer = write.llm_summary if C.ALLOW_LLM else (lambda j: None)
+        summarizer = write.llm_summary if C.ALLOW_LLM and not C.OFFLINE else (lambda j: None)
     summary = summarizer(slim)
     brief = {
         "date": today.isoformat(),
@@ -173,7 +173,14 @@ def run(now=None, root=ROOT, review_fetch=None, weather_fetch=None, summarizer=N
         brief["consult"] = judge.consult_drafts(today, out)
     except Exception as e:  # noqa: BLE001
         brief["consult"] = fallback("consult", e)
-    if out["review"] is None and C.APP_ID:
+    try:
+        brief["plan"] = judge.plan_drafts(today, out)
+    except Exception as e:  # noqa: BLE001
+        brief["plan"] = fallback("plan", e)
+    bt = _load(C.BUNDLE / "docs" / "backtest_reviews.json") if C.SAMPLE else {}
+    brief["backtest"] = {k: bt[k] for k in ("from", "to", "days", "flagged_days", "flagged_by_blocked", "per_week",
+                                                                         "all_low_flagged")} if bt else None
+    if out["review"] is None and C.APP_ID and not C.OFFLINE:
         brief["run_at"] = prev.get("run_at", brief["run_at"])  # 새 리뷰 기준 시각은 성공한 실행만 옮긴다
 
     # 기록. 날짜별 집계만 남긴다
@@ -205,6 +212,8 @@ def run(now=None, root=ROOT, review_fetch=None, weather_fetch=None, summarizer=N
         (docs / "weekly.md").write_text(write.weekly_markdown(brief), encoding="utf-8")
     if brief["consult"]:
         (docs / "consult.md").write_text(write.consult_markdown(brief), encoding="utf-8")
+    if brief["plan"]:
+        (docs / "plan.md").write_text(write.plan_markdown(brief), encoding="utf-8")
     (docs / "data.js").write_text("window.BRIEF = " + json.dumps({**brief, "history": history}, ensure_ascii=False)
                                   + ";\n", encoding="utf-8")
 

@@ -59,6 +59,7 @@ def load(paths=None):
     g["SAMPLE"] = MODE == "sample"
     g["STORE_NAME"] = run.get("store_name", "")
     g["ALLOW_LLM"] = run.get("allow_llm", SAMPLE)
+    g["OFFLINE"] = run.get("offline", False)
     g["WEBHOOK_ENV"] = run.get("webhook_env", "")
     g["REPO_URL"] = run.get("repo_url", "")
     # 시연은 docs/ 와 data/ 에 쓰고(공개), 내 데이터는 output/ 에만 쓴다(.gitignore)
@@ -80,6 +81,7 @@ def load(paths=None):
     g["COLUMNS"] = cfg.get("columns", {})
     g["TOUCH"] = cfg.get("touchpoint_daily", {})
     g["CONSULT"] = cfg.get("consult", {})
+    g["PLAN"] = cfg.get("plan", {})
 
     p = cfg["pilot"]
     g["PILOT_START"] = p["start"] if isinstance(p["start"], dt.date) else dt.date.fromisoformat(p["start"])

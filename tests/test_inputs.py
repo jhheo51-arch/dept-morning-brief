@@ -293,3 +293,30 @@ def test_consult_drafts_group_by_recipient(tmp_path):
     md = (tmp_path / "docs" / "consult.md").read_text(encoding="utf-8")
     assert md.startswith("# 협의 초안 2026-11-05") and "가상" in md
     assert "·" not in md and "→" not in md
+
+
+def test_plan_drafts_follow_calendar(tmp_path):
+    b = main.run(NOW, tmp_path, lambda now: ([], []), lambda d: {}, lambda j: None)
+    cards = {c["pilot"]: c for c in b["plan"]["cards"]}
+    days = b["calendar"]["days"]
+    # 시범마다 달력에서 그 시범이 처음 나오는 날을 고른다
+    for n, c in cards.items():
+        assert c["date"] == next(x["date"] for x in days if n in x["pilots"])
+        assert c["target"] and c["copy_a"] and c["measure"]
+    assert cards[1]["date"] == "2026-11-05" and cards[2]["date"] == "2026-11-08"
+    assert any(b["pilot"]["decision"] in x for x in cards[1]["notes"])
+    # 비 예보가 없는 날에는 비 문구를 쓰지 않는다
+    assert "비 소식" not in cards[2]["copy_a"]
+    rainy = main.run(NOW, tmp_path, lambda now: ([], []), lambda d: {"2026-11-08": 12.0}, lambda j: None)
+    assert "비 소식" in {c["pilot"]: c for c in rainy["plan"]["cards"]}[2]["copy_a"]
+    md = (tmp_path / "docs" / "plan.md").read_text(encoding="utf-8")
+    assert md.startswith("# 집객 기획 초안 2026-11-05") and "·" not in md and "→" not in md
+
+
+def test_offline_skips_network(tmp_path):
+    def boom(*a):
+        raise AssertionError("offline 인데 인터넷 수집을 부름")
+    C.OFFLINE = True
+    b = main.run(NOW, tmp_path, boom, boom, lambda j: None)
+    assert b["review"] is None and not b["failures"]
+    assert all(x["rain"] is None for x in b["calendar"]["days"])
