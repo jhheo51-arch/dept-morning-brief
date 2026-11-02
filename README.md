@@ -110,6 +110,62 @@ Slack이나 Teams 수신 웹훅 주소를 환경변수 `BRIEF_WEBHOOK_URL`에 �
 | `[field] touchpoints` | 접점 이름, 방문 주기(일), 볼 것 질문 |
 | `[reviews] app_id` | 볼 앱. 리뷰를 안 볼 때는 `""` |
 
+설정을 고친 뒤에는 `run_brief.bat`를 한 번 눌러 화면 맨 위에 설정 오류 안내가 없는지 봅니다.
+
+## 매일 쓰는 법
+
+| 때 | 할 일 |
+|---|---|
+| 전날 퇴근 전 또는 아침 | 어제 매출을 `sales.xlsx`에 붙여 넣습니다. 새로 잡힌 행사나 바뀐 VMD 상태는 `promotions.xlsx`에 고칩니다 |
+| 07:30 | 작업 스케줄러가 돌거나 `run_brief.bat`를 누릅니다 |
+| 출근 직후 | `output/site/index.html`에서 "오늘 볼 것 세 가지"와 확인 필요 블록부터 봅니다. 팀 공유가 필요하면 `brief.md` 내용을 붙여 넣습니다 |
+| 현장 방문 뒤 | `field_log.xlsx`에 날짜, 접점, 결과(정상, 문제, 해결 중), 메모를 한 줄 적습니다. "문제"나 "해결 중"으로 적은 접점은 "정상" 기록이 생길 때까지 다음 날 목록에 다시 올라옵니다 |
+| 시범 중 매주 | `pilot_weekly.xlsx`에 그 주 받음, 남겨둠 그룹 줄을 하나씩 더합니다 |
+
+## 새 항목 반영하기
+
+### 새 자료: 엑셀에 줄을 더합니다
+
+새 행사, 새 매출 구분(예: "뷰티"), 새 현장 기록은 해당 엑셀에 줄만 더하면 다음 실행부터 화면에 나옵니다. 코드와 설정은 그대로 둡니다.
+
+### 새 기준이나 접점: `config.local.toml`에 적습니다
+
+숫자 기준은 바꿀 값만 적습니다.
+
+```toml
+[sales]
+yoy_alert_pct = -5
+
+[promotions]
+vmd_ready_days = 5
+done_words = ["완료", "확정", "설치 완료", "검수 완료"]
+
+[calendar]
+extra_holidays = { "2026-11-16" = "정기 휴점" }
+```
+
+목록(`touchpoints` 같은 `[ ]` 값)은 통째로 바뀝니다. 접점을 하나 더할 때는 `config.toml`의 `[field] touchpoints` 목록 전체를 복사해 붙이고 새 줄을 더합니다. `weekday_place` 같은 상황별 접점과 `review_words`에 적힌 접점 이름이 이 목록에 없으면 실행 때 "점검 질문이 없는 접점" 오류가 납니다.
+
+```toml
+[field]
+touchpoints = [
+  # config.toml 의 기존 줄을 그대로 붙여 넣고
+  { name = "VIP 주차장", every_days = 7, check = "발렛 대기 안내와 우수고객 전용 구역 표시가 보이는가" },
+]
+```
+
+`field_log.xlsx`의 "접점" 열에는 여기 적은 이름을 그대로 씁니다.
+
+### 새 블록: 코드를 더합니다
+
+화면에 없는 업무(예: 문화센터 수강 신청 현황, 라운지 이용 수, 상담실 문의 유형)는 세 곳을 더합니다.
+
+1. `brief/inputs.py`의 `SCHEMAS`와 `HELP`에 새 파일 이름과 열을 적습니다. `python -m brief.init`이 양식을 만들어 줍니다.
+2. `brief/judge.py`에 판단 함수를 하나 더하고 `brief/main.py`에서 부릅니다. 기준 숫자는 `config.toml`에 둡니다.
+3. `docs/index.html`에 블록을 더합니다. sample 모드로 보려면 `brief/samples.py`에 가상 자료도 더합니다.
+
+기존 매출 규칙(`rule_sales`)과 행사 규칙(`rule_promos`)이 같은 모양이라 그대로 따라 만들면 됩니다.
+
 ### 보안 주의
 
 - `config.local.toml`의 `allow_llm`은 꺼 둡니다. 켜면 판단 결과(매출 숫자 포함)가 Claude API로 나갑니다. 꺼져 있으면 정해진 문장 틀로 요약하고, 외부로 나가는 요청은 앱 리뷰와 날씨 조회뿐이며 내 숫자는 들어가지 않습니다.
