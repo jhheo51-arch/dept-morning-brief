@@ -160,3 +160,14 @@ def weekly_markdown(b):
               "가상 데이터로 만든 시연입니다." if b.get("mode", "sample") == "sample"
               else "내 업무 파일로 만든 초안입니다. 외부에 공유하지 마세요.", ""]
     return "\n".join(lines)
+
+
+def consult_markdown(b):
+    c = b["consult"]
+    lines = [f"# 협의 초안 {b['date']}", ""]
+    if not c["drafts"]:
+        lines += ["오늘은 협의할 확인 필요 항목이 없습니다.", ""]
+    for d in c["drafts"]:
+        lines += [f"## {d['to']}", "", d["text"], ""]
+    lines += [f"묶는 규칙: {c['rule_text']}.", "보내기 전에 문장을 다듬고, 숫자는 원본 파일과 한 번 더 맞춰 봅니다.", ""]
+    return "\n".join(lines)

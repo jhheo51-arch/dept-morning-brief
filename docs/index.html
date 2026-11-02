@@ -67,6 +67,10 @@ ul.plain{margin:4px 0; padding-left:18px; font-size:14px} ul.plain li{margin:3px
 .warnline{display:block; font-size:12.5px; color:var(--orange-d); font-weight:600}
 .empty{font-size:14px; color:var(--ink2); background:var(--bg); border-radius:8px; padding:12px 14px; margin-top:8px}
 .empty code{font-size:13px}
+.memo{white-space:pre-wrap; background:var(--bg); border-radius:8px; padding:10px 12px; font-size:13px; line-height:1.6; margin:6px 0 0}
+.copy{font:inherit; font-size:12px; border:1px solid var(--line); background:var(--card); color:var(--ink2); border-radius:6px; padding:2px 8px; margin-left:8px; cursor:pointer}
+details.draft{border-top:1px solid var(--line); padding:8px 0}
+details.draft summary{cursor:pointer; font-weight:700}
 .tbl td.d{white-space:nowrap; font-variant-numeric:tabular-nums}
 .scroll{overflow-x:auto}
 .chart svg{display:block; width:100%; height:auto}
@@ -107,6 +111,7 @@ footer{font-size:13px; color:var(--muted); text-align:center; margin-top:24px}
     <section class="card" id="touch"></section>
     <section class="card" id="weekly"></section>
   </div>
+  <section class="card" id="consult" style="margin-bottom:16px"></section>
   <div class="grid2">
     <section class="card" id="c41"></section>
     <section class="card" id="c43"></section>
@@ -234,6 +239,27 @@ footer{font-size:13px; color:var(--muted); text-align:center; margin-top:24px}
     h+=src('주간 정리', Wk.source);
   } else h+='<div class="empty">주간 정리를 만들지 못했습니다.</div>';
   $('weekly').innerHTML=h;
+
+  // 협의 초안
+  var Cs=B.consult; h='<h3>협의 초안'+VT+'</h3><div class="sub">오늘 확인 필요 항목을 받는 사람별 메모로 묶었습니다. 보내기 전에 다듬어 씁니다.';
+  if(Cs){
+    h+=' <a href="consult.md">consult.md 받기</a></div>';
+    if(Cs.drafts.length){
+      h+=Cs.drafts.map(function(d,n){
+        return '<details class="draft"'+(n===0?' open':'')+'><summary>'+esc(d.to)+' <span class="sub">'+d.count+'건</span>'
+          +'<button class="copy" data-n="'+n+'">복사</button></summary><p class="memo">'+esc(d.text)+'</p></details>'}).join('');
+    } else h+='<div class="empty">오늘은 협의할 확인 필요 항목이 없습니다.</div>';
+    h+=src(Cs.rule_text, Cs.source);
+  } else h+='</div><div class="empty">협의 초안을 만들지 못했습니다.</div>';
+  $('consult').innerHTML=h;
+  Array.prototype.forEach.call(document.querySelectorAll('#consult .copy'),function(b){
+    b.addEventListener('click',function(e){
+      e.preventDefault();
+      var t=Cs.drafts[+b.getAttribute('data-n')].text;
+      if(navigator.clipboard) navigator.clipboard.writeText(t).then(function(){b.textContent='복사됨'},function(){b.textContent='복사 안 됨'});
+      else b.textContent='복사 안 됨';
+    });
+  });
 
   // 4.1
   var r=B.review; h='<h3>고객 접점 알림</h3>';

@@ -2,6 +2,7 @@
 import csv
 import datetime as dt
 import json
+import re
 
 import pytest
 
@@ -269,4 +270,26 @@ def test_sample_mode_new_blocks_and_weekly(tmp_path):
     assert titles[:2] == ["매출", "행사 성과"] and b["weekly"]["to"] == "2026-11-04"
     md = (tmp_path / "docs" / "weekly.md").read_text(encoding="utf-8")
     assert md.startswith("# 주간 정리 2026-10-29 ~ 2026-11-04") and "가상" in md
+    assert "·" not in md and "→" not in md
+
+
+def test_consult_drafts_group_by_recipient(tmp_path):
+    b = main.run(NOW, tmp_path, lambda now: ([], []), lambda d: {}, lambda j: None)
+    drafts = {d["to"]: d for d in b["consult"]["drafts"]}
+    assert "VMD 담당" in drafts and "채널 담당" in drafts and not b["failures"]
+    # 성과가 낮은 행사는 VMD와 채널 둘 다에 간다
+    for i in b["promo_results"]["items"]:
+        if i["flag"]:
+            assert all(any(i["name"] in x["fact"] for x in drafts[k]["items"]) for k in ("VMD 담당", "채널 담당"))
+    # 접점 표시는 그 접점 담당에게
+    for t in b["touch"]["flagged"]:
+        assert f"{t['place']} 담당" in drafts
+    # 초안 속 % 숫자는 모두 판단 결과에 있는 숫자
+    judged = json.dumps({k: b[k] for k in ("sales", "promo_results", "touch")}, ensure_ascii=False)
+    for d in drafts.values():
+        for x in d["items"]:
+            for n in re.findall(r"[+-]?(\d+(?:\.\d+)?)%", x["fact"]):
+                assert n in judged, (n, x["fact"])
+    md = (tmp_path / "docs" / "consult.md").read_text(encoding="utf-8")
+    assert md.startswith("# 협의 초안 2026-11-05") and "가상" in md
     assert "·" not in md and "→" not in md

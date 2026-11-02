@@ -15,7 +15,8 @@ from .collect import KST
 ROOT = C.ROOT
 BLOCKS = {"review": "리뷰 수집", "calendar": "날씨 예보 수집", "pilot": "시범 계산", "field": "현장 목록 판단",
           "sales": "매출 파일 읽기", "promos": "행사 파일 읽기", "promo_results": "행사 성과 계산",
-          "touch": "접점 숫자 파일 읽기", "weekly": "주간 정리"}
+          "touch": "접점 숫자 파일 읽기", "weekly": "주간 정리",
+         "consult": "협의 초안"}
 FILES = {"sales": "sales", "promos": "promotions", "pilot": "pilot_weekly", "field": "field_log",
          "touch": "touchpoint_daily"}
 
@@ -168,6 +169,10 @@ def run(now=None, root=ROOT, review_fetch=None, weather_fetch=None, summarizer=N
         brief["weekly"] = judge.week_summary(today, out, log)
     except I.InputError as e:
         brief["weekly"] = fallback("weekly", e)
+    try:
+        brief["consult"] = judge.consult_drafts(today, out)
+    except Exception as e:  # noqa: BLE001
+        brief["consult"] = fallback("consult", e)
     if out["review"] is None and C.APP_ID:
         brief["run_at"] = prev.get("run_at", brief["run_at"])  # 새 리뷰 기준 시각은 성공한 실행만 옮긴다
 
@@ -198,6 +203,8 @@ def run(now=None, root=ROOT, review_fetch=None, weather_fetch=None, summarizer=N
     (docs / "brief.md").write_text(write.brief_markdown(brief), encoding="utf-8")
     if brief["weekly"]:
         (docs / "weekly.md").write_text(write.weekly_markdown(brief), encoding="utf-8")
+    if brief["consult"]:
+        (docs / "consult.md").write_text(write.consult_markdown(brief), encoding="utf-8")
     (docs / "data.js").write_text("window.BRIEF = " + json.dumps({**brief, "history": history}, ensure_ascii=False)
                                   + ";\n", encoding="utf-8")
 

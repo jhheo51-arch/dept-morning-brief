@@ -589,3 +589,60 @@ def week_summary(today, out, field_log=None):
                          "lines": [f"{pilot.get('week_label', '')}: {pilot['decision']}"]})
     return {"rule": "주간 정리", "from": start.isoformat(), "to": end.isoformat(), "sections": sections,
             "source": "오늘 판단 결과와 현장 기록(field_log). 주간 보고 초안이며 문장은 담당자가 다듬습니다"}
+
+
+# 협의 초안
+def consult_drafts(today, out):
+    """오늘 확인 필요 항목을 받는 사람별 메모로 묶는다. 사실은 판단 결과의 숫자만, 요청은 정해진 문장만 쓴다."""
+    who = C.CONSULT
+    vmd, channel, app = who.get("vmd", "VMD 담당"), who.get("channel", "채널 담당"), who.get("app", "앱 운영 담당")
+    v = "(가상)" if C.SAMPLE else ""
+    memo = collections.defaultdict(list)
+
+    def add(to, fact, ask):
+        memo[to].append({"fact": fact, "ask": ask})
+
+    def md(x):
+        return x[5:].replace("-", "/")
+    promos = out.get("promos")
+    for i in (promos or {}).get("items", []):
+        where = f"{i['name']}, {i['place'] + ' ' if i['place'] else ''}{md(i['start'])}~{md(i['end'])}"
+        for w in i["warns"]:
+            if w.startswith("VMD"):
+                add(vmd, f"{where}: {w}", "완료 예정일과 막힌 부분을 알려 주세요.")
+            elif w == "알릴 길 미정":
+                add(channel, f"{where}: 알릴 길이 정해지지 않았습니다({i['phase']})", "쓸 수 있는 채널과 보낼 날짜를 정해 주세요.")
+            else:
+                add(channel, f"{where}: 내일 종료", "마감 안내 발송 여부를 확인해 주세요.")
+    res = out.get("promo_results")
+    for i in (res or {}).get("items", []):
+        if i["flag"]:
+            fact = (f"{i['name']}, {i['part']} 매출 {md(i['start'])}~{md(i['to'])}: {i['sales_text']}{v}, "
+                    f"앞 같은 요일 기간 대비 {i['growth']:+}%")
+            add(vmd, fact, "진열 위치와 안내물을 바꿀 여지가 있는지 함께 보고 싶습니다. 원인은 아직 확인 전입니다.")
+            add(channel, fact, "알림 시간과 문구를 바꿀 여지가 있는지 함께 보고 싶습니다. 원인은 아직 확인 전입니다.")
+    sales = out.get("sales")
+    for p in (sales or {}).get("parts", []):
+        if p["flags"]:
+            add(f"{p['part']} 영업 담당", f"{md(sales['date'])} {p['part']} 매출{v}: {', '.join(p['flags'])}",
+                "그날 현장에서 달랐던 점(품절, 행사 종료, 날씨 등)이 있었는지 알려 주세요.")
+    touch = out.get("touch")
+    for t in (touch or {}).get("flagged", []):
+        add(f"{t['place']} 담당", f"{md(t['date'])} {t['metric']}{v}: {t['value']:,.0f}, "
+            f"평소(직전 같은 요일 평균) {t['base']:,} 대비 {t['change_pct']:+}%",
+            "기록이 빠진 것인지 실제로 달라진 것인지 확인해 주세요.")
+    review = out.get("review")
+    if review and review["status"] == "확인 필요":
+        add(app, f"새 1~2점 리뷰 {review['low_new']}건, 앱이 막혔다는 리뷰 {review['blocked_new']}건",
+            "같은 시간대에 장애나 배포가 있었는지 알려 주세요.")
+    drafts = []
+    for to, items in memo.items():
+        text = [f"{to}님, 오늘({today.isoformat()}) 아침 점검에서 같이 볼 것이 있어 공유드립니다.", ""]
+        text += [f"{n}. {x['fact']}. {x['ask']}" for n, x in enumerate(items, 1)]
+        text += ["", "숫자는 아침 점검 결과에서 옮겼습니다." + (" 가상 데이터로 만든 시연입니다." if C.SAMPLE else "")]
+        drafts.append({"to": to, "count": len(items), "items": items, "text": "\n".join(text)})
+    drafts.sort(key=lambda d: -d["count"])
+    return {"rule": "협의 초안", "drafts": drafts,
+            "rule_text": "VMD 경고는 VMD 담당, 알릴 길과 마감 안내는 채널 담당, 성과가 낮은 행사는 둘 다, "
+                         "구분 매출 경고는 그 구분 영업 담당, 접점 숫자 표시는 그 접점 담당, 리뷰 확인 필요는 앱 운영 담당",
+            "source": "오늘 판단 결과. 요청 문장은 정해진 목록이며 보내기 전에 담당자가 다듬습니다"}

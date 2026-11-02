@@ -79,6 +79,7 @@ def load(paths=None):
     g["SALES"], g["PROMO"] = cfg["sales"], cfg["promotions"]
     g["COLUMNS"] = cfg.get("columns", {})
     g["TOUCH"] = cfg.get("touchpoint_daily", {})
+    g["CONSULT"] = cfg.get("consult", {})
 
     p = cfg["pilot"]
     g["PILOT_START"] = p["start"] if isinstance(p["start"], dt.date) else dt.date.fromisoformat(p["start"])
