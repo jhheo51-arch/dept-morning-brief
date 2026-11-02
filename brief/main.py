@@ -61,7 +61,7 @@ def run(now=None, root=ROOT, review_fetch=None, weather_fetch=None, summarizer=N
         samples.make(in_dir, today)
     prev = _load(data / "latest.json")
     last_ok = dict(prev.get("last_ok", {}))
-    failures, texts, out, missing = [], [], {}, []
+    failures, texts, out, missing, empty = [], [], {}, [], []
     review_fetch = review_fetch or collect.fetch_reviews
     weather_fetch = weather_fetch or collect.fetch_weather
 
@@ -75,9 +75,11 @@ def run(now=None, root=ROOT, review_fetch=None, weather_fetch=None, summarizer=N
         return old
 
     def table(key):
-        rows = I.read_table(FILES[key], in_dir)
+        rows = I.read_table(FILES[key], in_dir, today)
         if rows is None:
             missing.append(f"{FILES[key]}.xlsx")
+        elif not rows:  # 양식만 넣고 내용을 아직 붙여 넣지 않은 경우
+            empty.append(f"{FILES[key]}.xlsx")
         return rows
 
     # 매출 현황, 행사 점검, 접점 숫자
@@ -120,7 +122,7 @@ def run(now=None, root=ROOT, review_fetch=None, weather_fetch=None, summarizer=N
     except Exception as e:  # noqa: BLE001
         fallback("calendar", e)
         weather = None
-    out["calendar"] = judge.rule_calendar(today, weather, alert)
+    out["calendar"] = judge.rule_calendar(today, weather, alert, out.get("promos"))
 
     # 4.3 시연은 가상 시범, 내 데이터 모드는 pilot_weekly 파일이 있을 때만
     try:
@@ -162,6 +164,9 @@ def run(now=None, root=ROOT, review_fetch=None, weather_fetch=None, summarizer=N
         "summary_by": "Claude(숫자 검사 통과)" if summary else "문장 틀",
         "failures": failures,
         "missing": missing,
+        "empty": empty,
+        "offline": C.OFFLINE,
+        "review_on": bool(C.APP_ID),
         "last_ok": last_ok,
         **out,
     }

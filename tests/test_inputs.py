@@ -76,15 +76,17 @@ def test_promos_vmd_deadline_and_channel(tmp_path):
     write_csv(tmp_path, "promotions", ["행사명", "시작일", "종료일", "알릴 길", "VMD 상태"], [
         ["가", "2026-11-07", "2026-11-10", "앱 푸시", "협의 중"],  # D-2, VMD 미완료
         ["나", "2026-11-07", "2026-11-10", "", "완료"],          # 알릴 길 없음
-        ["다", "2026-11-12", "2026-11-15", "문자", "요청 전"],    # D-7, 아직 경고 아님
+        ["다", "2026-11-12", "2026-11-15", "문자", "요청 전"],    # D-7, 요청 전이면 바로 경고
+        ["바", "2026-11-06", "2026-11-08", "문자", "완료(10/30)"],  # 완료 단어가 들어 있으면 끝남
         ["라", "2026-10-01", "2026-10-30", "문자", "완료"],       # 끝난 행사
         ["마", "2026-11-20", "2026-11-25", "문자", "요청 전"],    # 7일 밖
     ])
     p = judge.rule_promos(I.read_table("promotions", tmp_path), TODAY)
     by = {i["name"]: i for i in p["items"]}
-    assert set(by) == {"가", "나", "다"}
+    assert set(by) == {"가", "나", "다", "바"}
     assert by["가"]["warns"] == ["VMD 협의 중(시작 D-2, 기준 D-3)"] and by["나"]["warns"] == ["알릴 길 미정"]
-    assert by["다"]["warns"] == [] and p["warn_count"] == 2 and p["status"] == "확인 필요"
+    assert by["다"]["warns"] == ["VMD 요청 전(시작 D-7, 지금 요청해야 D-3까지 끝남)"] and by["바"]["warns"] == []
+    assert p["warn_count"] == 3 and p["status"] == "확인 필요"
 
 
 def test_promos_end_before_start_is_error(tmp_path):
@@ -320,3 +322,73 @@ def test_offline_skips_network(tmp_path):
     b = main.run(NOW, tmp_path, boom, boom, lambda j: None)
     assert b["review"] is None and not b["failures"]
     assert all(x["rain"] is None for x in b["calendar"]["days"])
+
+
+# 페르소나 점검에서 나온 보완점
+def test_thousand_won_header_and_config_unit(tmp_path):
+    write_csv(tmp_path, "sales", ["날짜", "구분", "매출(천원)", "목표(천원)"], [["2026-11-04", "전체", "120,000", "100,000"]])
+    s = judge.rule_sales(I.read_table("sales", tmp_path), TODAY)
+    assert s["total"]["sales"] == 120_000_000 and s["total"]["target"] == 100_000_000 and "천원" in s["source"]
+    real_mode(tmp_path, '[sales]\nunit = "천원"\n')
+    write_csv(tmp_path, "sales", ["날짜", "구분", "매출"], [["2026-11-04", "전체", "5,000"], ["2026-11-03", "전체", "3백만원"]])
+    s = judge.rule_sales(I.read_table("sales", tmp_path), TODAY)
+    assert s["total"]["sales"] == 5_000_000 and s["mtd"]["sales"] == 8_000_000  # 칸에 적힌 단위가 설정보다 먼저
+    # 설정의 사내 열 이름에 단위까지 적어도 맞는다
+    real_mode(tmp_path, '[columns.sales]\n"매출" = "순매출액(천원)"\n')
+    write_csv(tmp_path, "sales", ["날짜", "구분", "순매출액(천원)"], [["2026-11-04", "전체", "7"]])
+    assert judge.rule_sales(I.read_table("sales", tmp_path), TODAY)["total"]["sales"] == 7_000
+
+
+def test_one_period_column_and_date_styles(tmp_path):
+    write_csv(tmp_path, "promotions", ["행사명", "기간", "알릴 길", "VMD 상태"], [
+        ["가", "11/7~11/10", "앱 푸시", "완료"],
+        ["나", "2026.11.08 - 2026.11.09", "문자", "완료"],
+        ["다", "11월 7일부터 9일까지", "문자", "완료"],
+        ["라", "20261106(금)~20261108(일)", "문자", "완료"],
+    ])
+    p = judge.rule_promos(I.read_table("promotions", tmp_path, TODAY), TODAY)
+    got = {i["name"]: (i["start"], i["end"]) for i in p["items"]}
+    assert got == {"가": ("2026-11-07", "2026-11-10"), "나": ("2026-11-08", "2026-11-09"),
+                   "다": ("2026-11-07", "2026-11-09"), "라": ("2026-11-06", "2026-11-08")}
+    write_csv(tmp_path, "promotions", ["행사명", "일정"], [["가", "11/7~11/10"]])
+    with pytest.raises(I.InputError, match="'기간' 한 칸도 됨"):
+        I.read_table("promotions", tmp_path, TODAY)
+
+
+def test_subtotal_in_any_column_and_merged_dates(tmp_path):
+    write_csv(tmp_path, "sales", ["날짜", "구분", "매출"], [
+        ["2026-11-04", "식품", "100"], ["", "패션", "200"], ["", "소계", "300"], ["", "", "300"],
+        ["2026-11-03", "식품", "50"]])
+    rows = I.read_table("sales", tmp_path)
+    assert [(r["날짜"], r["구분"]) for r in rows] == [("2026-11-04", "식품"), ("2026-11-04", "패션"), ("2026-11-03", "식품")]
+
+
+def test_empty_template_is_not_missing(tmp_path):
+    real_mode(tmp_path)
+    write_csv(tmp_path / "inputs", "promotions", ["행사명", "시작일", "종료일"], [])
+    sales_rows(tmp_path / "inputs", [["2026-11-04", "전체", 80, 100, 100]])
+    b = main.run(NOW, tmp_path, None, lambda d: {})
+    assert "promotions.xlsx" in b["empty"] and "promotions.xlsx" not in b["missing"] and not b["failures"]
+
+
+def test_offline_summary_says_why_reviews_are_off(tmp_path):
+    C.OFFLINE = True
+    b = main.run(NOW, tmp_path, None, None, lambda j: None)
+    assert b["offline"] is True and "offline" in b["summary"]
+
+
+def test_consult_merges_same_promo_for_same_person():
+    out = {"promos": {"items": [{"name": "가", "place": "", "start": "2026-11-04", "end": "2026-11-05", "phase": "진행 중",
+                                 "warns": ["VMD 협의 중(이미 시작)", "알릴 길 미정", "내일 종료, 마감 안내 확인"]}]}}
+    d = {x["to"]: x["items"] for x in judge.consult_drafts(TODAY, out)["drafts"]}
+    assert len(d["VMD 담당"]) == 1 and len(d["채널 담당"]) == 1
+    assert "내일 종료" in d["채널 담당"][0]["fact"] and "마감 안내" in d["채널 담당"][0]["ask"]
+
+
+def test_last_day_copy_only_when_a_promo_ends(tmp_path):
+    b = main.run(NOW, tmp_path, lambda now: ([], []), lambda d: {}, lambda j: None)
+    ends = {i["end"] for i in b["promos"]["items"]}
+    for c in b["plan"]["cards"]:
+        assert ("마지막 날" in c["copy_a"]) == (c["date"] in ends)
+    for x in b["calendar"]["days"]:
+        assert x["ending"] == [i["name"] for i in b["promos"]["items"] if i["end"] == x["date"]]

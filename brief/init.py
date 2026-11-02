@@ -13,6 +13,9 @@ mode = "real"
 store_name = "내 점포"
 # 매출 같은 내부 숫자가 외부 API로 나가므로 꺼 둡니다. 회사 보안 기준을 확인한 뒤에만 켭니다.
 allow_llm = false
+# 인터넷에 전혀 나가지 않습니다(앱 리뷰와 날씨 예보를 건너뛰고 요일과 공휴일로만 달력을 만듦).
+# 회사 IT에서 외부 접속(Google Play, Open-Meteo)을 허용받은 뒤에 false 로 바꿉니다.
+offline = true
 repo_url = ""
 
 # [reviews]
@@ -28,6 +31,7 @@ repo_url = ""
 # extra_holidays = { "2026-11-16" = "정기 휴점" }
 
 # [sales]
+# unit = "천원"             # 사내 파일 금액이 천원 단위면. 열 이름이 '매출(천원)'이면 적지 않아도 됩니다
 # yoy_alert_pct = -10       # 전년 대비 이 % 이하이면 확인 필요
 # target_alert_pct = 90     # 목표 달성률이 이 % 미만이면 확인 필요
 
@@ -37,7 +41,7 @@ repo_url = ""
 
 # [promotions]
 # result_days = 14          # 끝난 뒤 며칠까지 행사 성과를 보여 줄지
-# result_low_pct = 0        # 앞 같은 요일 기간 대비 이 % 미만이면 확인 필요
+# result_low_pct = -5       # 앞 같은 요일 기간 대비 이 % 이하이면 확인 필요(가정값)
 
 # [touchpoint_daily]
 # change_pct = 30           # 평소(직전 4주 같은 요일 평균)보다 이 % 넘게 다르면 확인 필요
@@ -73,7 +77,7 @@ def make_templates(folder):
             help_ws.append([col, "예" if col in need else "아니요", I.HELP[name].get(col, "")])
         help_ws.column_dimensions["C"].width = 70
         help_ws.append([])
-        help_ws.append(["첫 시트(입력)만 읽습니다. 열 이름은 양식대로 두는 것이 가장 쉽습니다. 사내 파일 열 이름이 다르면 config.local.toml 의 [columns] 에 적습니다. 열 이름 줄 위의 제목 줄(10줄까지)과 첫 칸이 합계, 소계인 줄, 빈 줄은 건너뜁니다."])
+        help_ws.append(["첫 시트(입력)만 읽습니다. 열 이름은 양식대로 두는 것이 가장 쉽습니다. 사내 파일 열 이름이 다르면 config.local.toml 의 [columns] 에 적습니다. 열 이름 줄 위의 제목 줄(10줄까지), 합계와 소계 줄, 빈 줄은 건너뜁니다. 날짜 칸이 병합되어 비어 있으면 윗줄 날짜를 씁니다. 금액이 천원 단위면 열 이름을 '매출(천원)'처럼 둡니다. 행사 기간이 한 칸('11/04~11/10')이면 열 이름을 '기간'으로 둡니다."])
         wb.save(p)
         made.append(p)
     return made

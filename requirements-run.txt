@@ -1,0 +1,5 @@
+# 내 데이터로 돌리는 데 꼭 필요한 것만 (회사 PC용)
+# 앱 리뷰를 보려면 google-play-scraper, Claude 요약을 쓰려면 anthropic 을 따로 더합니다
+numpy>=2.0
+holidays>=0.60
+openpyxl>=3.1

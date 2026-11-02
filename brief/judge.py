@@ -123,14 +123,16 @@ def rule_sales(rows, today):
         "series30": series,
         "yoy_alert_pct": yoy_thr, "target_alert_pct": tgt_thr,
         "rule_text": f"어제 또는 최근 7일 전년 대비 {yoy_thr}% 이하, 어제 목표 달성 {tgt_thr}% 미만이면 확인 필요",
-        "source": _src(rows[0]["_file"]),
+        "unit_note": I.unit_note(rows),
+        "source": _src(rows[0]["_file"]) + (f". {I.unit_note(rows)}" if I.unit_note(rows) else ""),
     }
 
 
 # 프로모션과 이벤트 점검
 def rule_promos(rows, today):
     look, ready = C.PROMO.get("lookahead_days", 7), C.PROMO.get("vmd_ready_days", 3)
-    done = set(C.PROMO.get("done_words", ["완료"]))
+    done = C.PROMO.get("done_words", ["완료"])
+    not_started = C.PROMO.get("not_started_words", ["요청 전"])
     items = []
     for r in rows:
         name = str(r["행사명"] or "").strip()
@@ -152,9 +154,12 @@ def rule_promos(rows, today):
         else:
             phase = f"진행 중, 종료 D-{(e - today).days}"
         warns = []
-        if (s - today).days <= ready and vmd not in done:
+        is_done = any(w in vmd for w in done)
+        if not is_done and (s - today).days <= ready:
             warns.append(f"VMD {vmd or '상태 미기재'}" + (f"(시작 D-{(s - today).days}, 기준 D-{ready})" if s > today
                                                      else "(이미 시작)"))
+        elif not is_done and any(w in vmd for w in not_started):
+            warns.append(f"VMD {vmd}(시작 D-{(s - today).days}, 지금 요청해야 D-{ready}까지 끝남)")
         if not ch:
             warns.append("알릴 길 미정")
         if 0 < (e - today).days <= 1 and s < today:
@@ -171,14 +176,15 @@ def rule_promos(rows, today):
         "upcoming": sum(1 for i in items if i["start"] > today.isoformat()),
         "warn_count": len(warned),
         "status": "확인 필요" if warned else "평소",
-        "rule_text": f"시작 D-{ready}까지 VMD가 {', '.join(sorted(done))} 이 아니면 경고, 알릴 길이 비면 경고, {look}일 안 시작까지 봄",
+        "rule_text": f"시작 D-{ready}까지 VMD 상태에 {', '.join(done)} 이 없으면 경고, {', '.join(not_started)} 이면 바로 경고, "
+                     f"알릴 길이 비면 경고, {look}일 안 시작까지 봄",
         "source": _src(rows[0]["_file"]) if rows else "행사 파일",
     }
 
 
 def rule_promo_results(promo_rows, sales_rows, today):
     """시작한 행사의 기간 매출(어제까지)을 바로 앞 같은 요일 기간과 견준다. 매출 구분이 있으면 그 구분만 본다."""
-    keep, low = C.PROMO.get("result_days", 14), C.PROMO.get("result_low_pct", 0)
+    keep, low = C.PROMO.get("result_days", 14), C.PROMO.get("result_low_pct", -5)
     total_name = C.SALES.get("total_name", "전체")
     by_day = sales_by_day(sales_rows, today)
     items = []
@@ -354,10 +360,22 @@ def _day(d, rain_mm, review_alert, is_today):
     return row
 
 
-def rule_calendar(today, weather, review_alert):
-    """weather: 날짜별 낮 강수 합. 수집에 실패했으면 None."""
+def fill_event(text, ending, fallback=""):
+    """문장의 {행사} 자리를 그날 끝나는 행사 이름으로 채운다. 끝나는 행사가 없으면 fallback 문장을 쓴다."""
+    if "{행사}" not in (text or ""):
+        return text or ""
+    return text.replace("{행사}", ", ".join(ending)) if ending else fallback
+
+
+def rule_calendar(today, weather, review_alert, promos=None):
+    """weather: 날짜별 낮 강수 합. 수집에 실패했으면 None. promos: 프로모션 점검 결과(끝나는 날을 달력에 잇는다)."""
     rows = [_day(today + dt.timedelta(days=i), None if weather is None else weather.get(
         (today + dt.timedelta(days=i)).isoformat()), review_alert, i == 0) for i in range(7)]
+    items = (promos or {}).get("items", [])
+    for row in rows:
+        # 행사 파일에서 그날 끝나는 행사를 찾는다. 없으면 "마지막 날" 문구를 쓰지 않는다
+        row["ending"] = [i["name"] for i in items if i["end"] == row["date"] and i["name"]]
+        row["benefit"] = fill_event(row["benefit"], row["ending"], C.CAL.get("no_ending_benefit", ""))
     return {
         "rule": "4.2 이번 주 집객 달력",
         "days": rows,
@@ -599,8 +617,15 @@ def consult_drafts(today, out):
     v = "(가상)" if C.SAMPLE else ""
     memo = collections.defaultdict(list)
 
-    def add(to, fact, ask):
-        memo[to].append({"fact": fact, "ask": ask})
+    def add(to, fact, ask, key=None):
+        """같은 사람에게 가는 같은 행사 항목은 한 줄로 묶는다."""
+        for x in memo[to]:
+            if key and x.get("key") == key:
+                x["fact"] += f", {fact.split(': ', 1)[-1]}"
+                if ask not in x["ask"]:
+                    x["ask"] += f" {ask}"
+                return
+        memo[to].append({"fact": fact, "ask": ask, "key": key})
 
     def md(x):
         return x[5:].replace("-", "/")
@@ -609,18 +634,19 @@ def consult_drafts(today, out):
         where = f"{i['name']}, {i['place'] + ' ' if i['place'] else ''}{md(i['start'])}~{md(i['end'])}"
         for w in i["warns"]:
             if w.startswith("VMD"):
-                add(vmd, f"{where}: {w}", "완료 예정일과 막힌 부분을 알려 주세요.")
+                add(vmd, f"{where}: {w}", "완료 예정일과 막힌 부분을 알려 주세요.", i["name"])
             elif w == "알릴 길 미정":
-                add(channel, f"{where}: 알릴 길이 정해지지 않았습니다({i['phase']})", "쓸 수 있는 채널과 보낼 날짜를 정해 주세요.")
+                add(channel, f"{where}: 알릴 길이 정해지지 않았습니다({i['phase']})", "쓸 수 있는 채널과 보낼 날짜를 정해 주세요.",
+                    i["name"])
             else:
-                add(channel, f"{where}: 내일 종료", "마감 안내 발송 여부를 확인해 주세요.")
+                add(channel, f"{where}: 내일 종료", "마감 안내 발송 여부를 확인해 주세요.", i["name"])
     res = out.get("promo_results")
     for i in (res or {}).get("items", []):
         if i["flag"]:
             fact = (f"{i['name']}, {i['part']} 매출 {md(i['start'])}~{md(i['to'])}: {i['sales_text']}{v}, "
                     f"앞 같은 요일 기간 대비 {i['growth']:+}%")
-            add(vmd, fact, "진열 위치와 안내물을 바꿀 여지가 있는지 함께 보고 싶습니다. 원인은 아직 확인 전입니다.")
-            add(channel, fact, "알림 시간과 문구를 바꿀 여지가 있는지 함께 보고 싶습니다. 원인은 아직 확인 전입니다.")
+            add(vmd, fact, "진열 위치와 안내물을 바꿀 여지가 있는지 함께 보고 싶습니다. 원인은 아직 확인 전입니다.", i["name"])
+            add(channel, fact, "알림 시간과 문구를 바꿀 여지가 있는지 함께 보고 싶습니다. 원인은 아직 확인 전입니다.", i["name"])
     sales = out.get("sales")
     for p in (sales or {}).get("parts", []):
         if p["flags"]:
@@ -640,10 +666,11 @@ def consult_drafts(today, out):
         text = [f"{to}님, 오늘({today.isoformat()}) 아침 점검에서 같이 볼 것이 있어 공유드립니다.", ""]
         text += [f"{n}. {x['fact']}. {x['ask']}" for n, x in enumerate(items, 1)]
         text += ["", "숫자는 아침 점검 결과에서 옮겼습니다." + (" 가상 데이터로 만든 시연입니다." if C.SAMPLE else "")]
+        items = [{k: v for k, v in x.items() if k != "key"} for x in items]
         drafts.append({"to": to, "count": len(items), "items": items, "text": "\n".join(text)})
     drafts.sort(key=lambda d: -d["count"])
     return {"rule": "협의 초안", "drafts": drafts,
-            "rule_text": "VMD 경고는 VMD 담당, 알릴 길과 마감 안내는 채널 담당, 성과가 낮은 행사는 둘 다, "
+            "rule_text": "VMD 경고는 VMD 담당, 알릴 길과 마감 안내는 채널 담당, 성과가 낮은 행사는 둘 다(같은 행사는 한 줄로), "
                          "구분 매출 경고는 그 구분 영업 담당, 접점 숫자 표시는 그 접점 담당, 리뷰 확인 필요는 앱 운영 담당",
             "source": "오늘 판단 결과. 요청 문장은 정해진 목록이며 보내기 전에 담당자가 다듬습니다"}
 
@@ -664,6 +691,7 @@ def plan_drafts(today, out):
     for n, row in picked.items():
         p = C.PLAN[n]
         d = dt.date.fromisoformat(row["date"])
+        end = row.get("ending", [])
         notes = []
         if n == "1" and pilot.get("decision") and pilot["decision"] != "집계 전":
             notes.append(f"진행 중인 시범{v} 신호는 {pilot['decision']}입니다. "
@@ -676,10 +704,13 @@ def plan_drafts(today, out):
             "date": row["date"], "when": f"{d.month}/{d.day}({DOW[d.weekday()]}) " + ", ".join(row["times"]),
             "situation": ", ".join(row["situation"]), "basis": row["basis"],
             "target": p.get("target", ""), "benefit": row["benefit"], "channels": row["channels"],
-            "copy_a": p["copy_a_rain"] if row["rain"] and p.get("copy_a_rain") else p.get("copy_a", ""), "copy_b": p.get("copy_b", ""),
+            "copy_a": fill_event(p["copy_a_rain"], end, p.get("copy_a_rain_none", "")) if row["rain"] and p.get("copy_a_rain")
+            else fill_event(p.get("copy_a", ""), end, p.get("copy_a_none", "")),
+            "copy_b": fill_event(p.get("copy_b", ""), end, p.get("copy_b_none", "")),
             "measure": p.get("measure", ""), "owner": p.get("owner", ""), "notes": notes})
     cards.sort(key=lambda c: (c["date"], c["pilot"]))
     return {"rule": "집객 기획 초안", "cards": cards[:C.PLAN.get("max_cards", 3)],
             "rule_text": "이번 주 달력에서 시범마다 가장 가까운 날 하나. 대상, 문구, 재는 법은 설정 문장, "
-                         "때와 혜택, 알릴 길은 달력 판단, 참고는 시범 신호와 성과가 낮은 행사",
+                         "때와 혜택, 알릴 길은 달력 판단, '마지막 날' 문구는 행사 파일에서 그날 끝나는 행사가 있을 때만, "
+                         "참고는 시범 신호와 성과가 낮은 행사",
             "source": "이번 주 집객 달력, 시범 점검, 행사 성과. 무엇을 할지는 담당자가 정합니다"}

@@ -87,6 +87,8 @@ def template_summary(out):
                  f"{review['blocked_new']}건이고 "
                  + (f"최근 30일 1~2점은 {t['low']}건, 막힘은 {t['blocked']}건입니다." if t
                     else f"지난 7일 합계는 {review['low_7d']}건입니다."))
+    elif C.APP_ID and C.OFFLINE:
+        s.append("인터넷을 쓰지 않는 설정(offline)이라 앱 리뷰는 보지 않았습니다.")
     elif C.APP_ID:
         s.append("앱 리뷰는 수집하지 못해 판단을 건너뜁니다.")
     if calendar:
@@ -146,6 +148,8 @@ def brief_markdown(b):
         lines += [f"- {f['message']}" for f in b["failures"] if f.get("message")]
     if b.get("missing"):
         lines += [f"아직 없는 파일: {', '.join(b['missing'])}(넣으면 그 블록이 나옵니다)", ""]
+    if b.get("empty"):
+        lines += [f"내용이 빈 파일: {', '.join(b['empty'])}(머리글 아래에 자료를 붙여 넣으면 나옵니다)", ""]
     lines += ["공개 데이터와 가상 데이터만 씁니다. 현대백화점 내부 자료가 아닙니다." if b.get("mode", "sample") == "sample"
               else "내 업무 파일로 만든 점검입니다. 외부에 공유하지 마세요.", ""]
     return "\n".join(lines)
