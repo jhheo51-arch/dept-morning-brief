@@ -1,0 +1,209 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>백화점 아침 점검</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css">
+<style>
+:root{
+  --bg:#f4f3ef; --card:#ffffff; --ink:#1e1e1e; --ink2:#4a4a4a; --muted:#767676; --line:#e4e2dc; --grid:#ecebe6;
+  --green:#1e9d8b; --green-d:#13806f; --mint:#e3f3f0; --orange:#ca7700; --orange-d:#a86200; --warm:#f7e8cf;
+  --gray:#c4c4c0; --virtual:#a86200; --virtual-bg:#f7e8cf; --band:#13806f; --band-ink:#ffffff; --band-sub:#d3eee9;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#131615; --card:#1c201f; --ink:#e8ebe9; --ink2:#c2c8c5; --muted:#949c99; --line:#2e3432; --grid:#262b29;
+    --green:#26a491; --green-d:#5cc4b3; --mint:#173430; --orange:#c97f12; --orange-d:#e0a04a; --warm:#3a2c16;
+    --gray:#4a514e; --virtual:#e0a04a; --virtual-bg:#3a2c16; --band:#0f5f53; --band-ink:#ffffff; --band-sub:#bfe5de;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#131615; --card:#1c201f; --ink:#e8ebe9; --ink2:#c2c8c5; --muted:#949c99; --line:#2e3432; --grid:#262b29;
+  --green:#26a491; --green-d:#5cc4b3; --mint:#173430; --orange:#c97f12; --orange-d:#e0a04a; --warm:#3a2c16;
+  --gray:#4a514e; --virtual:#e0a04a; --virtual-bg:#3a2c16; --band:#0f5f53; --band-ink:#ffffff; --band-sub:#bfe5de;
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--bg); color:var(--ink); font-family:Pretendard,"Apple SD Gothic Neo","Malgun Gothic",sans-serif;
+  font-size:15px; line-height:1.55; -webkit-font-smoothing:antialiased; word-break:keep-all}
+.wrap{max-width:1080px; margin:0 auto; padding:28px 24px 64px}
+header.top{display:flex; justify-content:space-between; align-items:flex-end; gap:16px; flex-wrap:wrap; margin-bottom:18px;
+  background:var(--band); color:var(--band-ink); border-radius:12px; padding:22px 26px 20px; border-bottom:5px solid var(--orange)}
+.brand{font-size:13px; font-weight:700; color:var(--band-sub)}
+h1{font-size:26px; margin:4px 0 0; letter-spacing:-.02em}
+.meta{font-size:13px; color:var(--band-sub); text-align:right}
+.theme-btn{margin-top:6px; background:none; border:1px solid var(--band-sub); color:var(--band-ink); border-radius:6px; padding:4px 10px; font:inherit; font-size:12px; cursor:pointer}
+.headline{background:var(--card); border-left:6px solid var(--green); border-radius:10px; padding:18px 22px; margin-bottom:16px}
+.headline .q{font-size:13px; color:var(--green-d); font-weight:700}
+.headline ol{margin:6px 0 0; padding-left:22px; font-size:17px; font-weight:600; line-height:1.6}
+.headline .sum{margin:10px 0 0; color:var(--ink2); font-size:14px}
+.headline .by{font-size:12px; color:var(--muted)}
+.alert{background:var(--warm); border-left:6px solid var(--orange); border-radius:10px; padding:12px 18px; margin-bottom:16px; font-size:14px}
+.grid2{display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-bottom:16px}
+.card{background:var(--card); border-radius:10px; padding:18px 20px 14px; min-width:0}
+.card h3{font-size:16px; margin:0; padding-left:10px; border-left:4px solid var(--green); line-height:1.25}
+.card .sub{font-size:13px; color:var(--muted); margin:2px 0 10px}
+.v{font-size:11px; font-weight:700; color:var(--virtual); background:var(--virtual-bg); border-radius:4px; padding:1px 5px; margin-left:6px; vertical-align:2px}
+.tag{display:inline-block; font-size:12px; font-weight:700; border-radius:4px; padding:1px 7px; margin-left:6px; vertical-align:2px}
+.tag.ok{background:var(--mint); color:var(--green-d)} .tag.warn{background:var(--warm); color:var(--orange-d)}
+.kpis{display:grid; grid-template-columns:repeat(3,1fr); gap:10px; margin:6px 0 8px}
+.kpi{border-top:3px solid var(--gray); padding-top:6px}
+.kpi.g{border-top-color:var(--green)} .kpi.o{border-top-color:var(--orange)}
+.kpi .l{font-size:12.5px; color:var(--muted)}
+.kpi .n{font-size:26px; font-weight:800; font-variant-numeric:tabular-nums}
+.kpi .n small{font-size:13px; font-weight:600; margin-left:2px}
+.kpi .s{font-size:12px; color:var(--ink2)}
+.kpi.g .n{color:var(--green-d)} .kpi.o .n{color:var(--orange-d)}
+ul.plain{margin:4px 0; padding-left:18px; font-size:14px} ul.plain li{margin:3px 0}
+.src{font-size:12px; color:var(--muted); border-top:1px solid var(--line); margin-top:10px; padding-top:8px}
+.tbl{width:100%; border-collapse:collapse; font-size:13.5px}
+.tbl th,.tbl td{text-align:left; padding:7px 6px; border-bottom:1px solid var(--line); vertical-align:top}
+.tbl th{font-size:12px; color:var(--muted); font-weight:600}
+.tbl tr.today td{background:var(--mint)}
+.tbl td.d{white-space:nowrap; font-variant-numeric:tabular-nums}
+.scroll{overflow-x:auto}
+.chart svg{display:block; width:100%; height:auto}
+.axis text{fill:var(--muted); font-size:10px}
+.legend{display:flex; gap:14px; font-size:12.5px; color:var(--ink2); margin:4px 0}
+.legend i{display:inline-block; width:10px; height:10px; border-radius:2px; vertical-align:middle; margin-right:5px}
+footer{font-size:13px; color:var(--muted); text-align:center; margin-top:24px}
+@media (max-width:760px){
+  .wrap{padding:16px 16px 48px} .grid2{grid-template-columns:1fr} .meta{text-align:left}
+  .kpis{grid-template-columns:repeat(3,1fr)} .kpi .n{font-size:22px} .headline ol{font-size:15.5px}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <div>
+      <div class="brand">백화점 마케팅 아침 점검 에이전트 | 개인 포트폴리오</div>
+      <h1 id="title">아침 점검</h1>
+    </div>
+    <div class="meta"><div id="runat"></div><button class="theme-btn" id="theme">화면 밝기 바꾸기</button></div>
+  </header>
+  <div id="alerts"></div>
+  <section class="headline">
+    <div class="q">오늘 볼 것 세 가지</div>
+    <ol id="top3"></ol>
+    <p class="sum" id="summary"></p>
+    <div class="by" id="by"></div>
+  </section>
+  <div class="grid2">
+    <section class="card" id="c41"></section>
+    <section class="card" id="c44"></section>
+  </div>
+  <section class="card" id="c42" style="margin-bottom:16px"></section>
+  <div class="grid2">
+    <section class="card" id="c43"></section>
+    <section class="card" id="hist"></section>
+  </div>
+  <footer>공개 데이터와 가상 데이터만 씁니다. 현대백화점 내부 자료가 아닙니다.<br>
+    판단 규칙과 코드: <a href="https://github.com/jhheo51-arch/dept-morning-brief">github.com/jhheo51-arch/dept-morning-brief</a></footer>
+</div>
+<script src="data.js"></script>
+<script>
+(function(){
+  var root=document.documentElement, btn=document.getElementById('theme');
+  try{var t=localStorage.getItem('theme'); if(t) root.setAttribute('data-theme',t);}catch(e){}
+  btn.onclick=function(){
+    var dark=root.getAttribute('data-theme')==='dark'||(!root.getAttribute('data-theme')&&matchMedia('(prefers-color-scheme: dark)').matches);
+    var n=dark?'light':'dark'; root.setAttribute('data-theme',n); try{localStorage.setItem('theme',n);}catch(e){}
+  };
+  var B=window.BRIEF, $=function(id){return document.getElementById(id)};
+  function esc(s){return String(s==null?'':s).replace(/[&<>"]/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]})}
+  function fmt(n){return n==null?'-':Number(n).toLocaleString('ko-KR')}
+  if(!B){ $('top3').innerHTML='<li>브리핑 파일을 읽지 못했습니다. 저장소의 data/latest.json 을 확인해 주세요.</li>'; return; }
+  var DOW='월화수목금토일';
+  var d=new Date(B.date+'T00:00:00');
+  $('title').textContent=B.date.replace(/-/g,'. ')+' ('+DOW[(d.getDay()+6)%7]+') 아침 점검';
+  $('runat').textContent='실행 '+B.run_at.replace('T',' ').slice(0,16)+' KST';
+  var al='';
+  if(B.error) al+='<div class="alert"><b>실행 실패</b> '+esc(B.error.at)+', 실패 단계 '+esc(B.error.step)+'. 아래는 마지막 성공('+esc(B.error.last_success)+') 결과입니다.</div>';
+  (B.failures||[]).forEach(function(f){ al+='<div class="alert"><b>'+esc(f.step)+' 실패</b>. 마지막 성공 '+esc(f.last_success||'없음')+', 해당 블록은 그때 결과이거나 비어 있습니다.</div>'; });
+  $('alerts').innerHTML=al;
+  $('top3').innerHTML=(B.top3||[]).map(function(t){return '<li>'+esc(t)+'</li>'}).join('');
+  $('summary').textContent=B.summary||'';
+  $('by').textContent='요약: '+(B.summary_by||'');
+  function src(rule,s){return '<div class="src">규칙 '+esc(rule)+' | 출처 '+esc(s)+'</div>'}
+
+  // 4.1
+  var r=B.review, h='<h3>고객 접점 알림</h3>';
+  if(r){
+    h+='<div class="sub">현대백화점 앱 1~2점 리뷰, '+esc(r.since)+' 이후'+(r.stale?' (지난 결과)':'')
+      +'<span class="tag '+(r.status==='확인 필요'?'warn':'ok')+'">'+esc(r.status)+'</span></div>';
+    h+='<div class="kpis"><div class="kpi '+(r.low_new?'o':'g')+'"><div class="l">새 1~2점</div><div class="n">'+r.low_new+'<small>건</small></div><div class="s">4주 하루 평균 '+r.avg28_per_day+'건, 차이 '+r.diff_vs_avg+'</div></div>'
+      +'<div class="kpi '+(r.blocked_new?'o':'g')+'"><div class="l">새 막힘</div><div class="n">'+r.blocked_new+'<small>건</small></div><div class="s">혜택 단어와 로그인, 실행 오류 단어가 함께</div></div>'
+      +'<div class="kpi"><div class="l">지난 7일 1~2점</div><div class="n">'+r.low_7d+'<small>건</small></div><div class="s">막힘 '+r.blocked_7d+'건</div></div></div>';
+    h+='<ul class="plain">'+Object.keys(r.topics_new).map(function(k){return '<li>'+esc(k)+' '+r.topics_new[k]+'건</li>'}).join('')+'</ul>';
+    h+='<ul class="plain">'+r.reasons.map(function(x){return '<li>판단 근거: '+esc(x)+'</li>'}).join('')+'</ul>';
+    h+=src(r.rule+' (막힘 1건 이상 또는 4주 평균의 2배 초과면 확인 필요)', r.source+'. 리뷰 원문, 작성자, 리뷰 ID는 저장하지 않음');
+  } else h+='<div class="sub">리뷰를 수집하지 못했고 지난 결과도 없습니다.</div>';
+  $('c41').innerHTML=h;
+
+  // 4.4
+  var f=B.field; h='<h3>오늘 현장 점검 목록</h3><div class="sub">오늘 돌아볼 접점 최대 3곳</div>';
+  if(f){
+    h+='<table class="tbl"><tr><th>접점</th><th>볼 것</th><th>고른 이유</th></tr>'+f.items.map(function(i){
+      return '<tr><td><b>'+esc(i.place)+'</b></td><td>'+esc(i.check)+'</td><td>'+esc(i.why)+'</td></tr>'}).join('')+'</table>';
+    h+=src(f.rule, f.source+'. 가 본 결과가 아니라 갈 곳과 볼 것을 정하는 목록');
+  }
+  $('c44').innerHTML=h;
+
+  // 4.2
+  var c=B.calendar; h='<h3>이번 주 집객 달력</h3><div class="sub">날짜별 상황, 맞는 시범(포트폴리오 6쪽), 알릴 길과 시간. 알릴 길은 '+esc(c?c.channel_note:'')+'</div>';
+  if(c){
+    var P={1:'1번 평일 퇴근길',2:'2번 일요일, 비 예보엔 먼저',3:'3번 막히는 곳 점검'};
+    h+='<div class="scroll"><table class="tbl"><tr><th>날짜</th><th>상황</th><th>맞는 시범</th><th>알릴 길 후보</th><th>보낼 시간 후보</th><th>혜택 유형</th><th>근거</th></tr>'
+      +c.days.map(function(x,i){return '<tr'+(i===0?' class="today"':'')+'><td class="d">'+x.date.slice(5).replace('-','/')+'</td><td>'+esc(x.situation.join(', '))+'</td><td>'
+        +(x.pilots.length?x.pilots.map(function(p){return esc(P[p])}).join('<br>'):'없음')+'</td><td>'+(esc(x.channels.join(', '))||'-')+'</td><td>'+(esc(x.times.join(', '))||'-')
+        +'</td><td>'+(esc(x.benefit)||'-')+'</td><td>'+esc(x.basis)+'</td></tr>'}).join('')+'</table></div>';
+    h+=src(c.rule+', '+c.rain_rule, c.source);
+  }
+  $('c42').innerHTML=h;
+
+  // 4.3
+  var p=B.pilot; h='<h3>시범 점검<span class="v">가상 데이터</span></h3>';
+  if(p){
+    h+='<div class="sub">6쪽 1번 시범, 시작 '+esc(p.start)+'(가정값), '+p.week+'주차'+(p.check_day?' <span class="tag warn">오늘 점검일</span>':'')+'</div>';
+    if(p.sent){
+      h+='<div class="kpis"><div class="kpi g"><div class="l">1인당 평일 저녁 방문</div><div class="n">'+(p.visit_diff>0?'+':'')+p.visit_diff+'<small>회</small></div><div class="s">받은 회원 '+p.visits_per_member_sent+', 남겨 둔 회원 '+p.visits_per_member_hold+'</div></div>'
+        +'<div class="kpi '+(p.new_ratio>p.breakeven?'g':'o')+'"><div class="l">새 방문 비율</div><div class="n">'+p.new_ratio+'<small>%</small></div><div class="s">본전 '+p.breakeven+'%(가정값)</div></div>'
+        +'<div class="kpi"><div class="l">푸시 수신 거부율</div><div class="n">'+p.optout_sent+'<small>%</small></div><div class="s">남겨 둔 회원 '+p.optout_hold+'%</div></div></div>';
+    }
+    h+='<p style="margin:6px 0;font-size:16px;font-weight:700;color:var(--green-d)">'+esc(p.decision)+'</p>';
+    h+='<ul class="plain">'+(p.reasons||[]).map(function(x){return '<li>'+esc(x)+'</li>'}).join('')+'</ul>';
+    if(p.sent) h+='<div class="sub">가상 회원 '+fmt(p.sent+p.hold)+'명, 받은 회원 '+fmt(p.sent)+'명, 남겨 둔 회원 '+fmt(p.hold)+'명</div>';
+    h+=src(p.rule+' (포트폴리오 7쪽 넓힌다, 고쳐서 다시, 멈춘다 기준. 4주차와 10주차 점검)', p.source);
+  }
+  $('c43').innerHTML=h;
+
+  // 지난 30일
+  h='<h3>지난 30일 기록</h3><div class="sub">리뷰 작성일 기준 1~2점 건수와 막힘 건수</div>';
+  var s=(r&&r.series30)||[];
+  if(s.length){
+    var W=480,H=150,pl=22,pb=22,bw=(W-pl)/s.length, mx=Math.max(2,Math.max.apply(null,s.map(function(x){return x.low})));
+    var svg='<svg viewBox="0 0 '+W+' '+H+'" role="img" aria-label="지난 30일 1~2점 리뷰와 막힘 건수">';
+    for(var k=0;k<=mx;k+=Math.ceil(mx/2)){var y=H-pb-(H-pb-8)*k/mx; svg+='<g class="axis"><line x1="'+pl+'" x2="'+W+'" y1="'+y+'" y2="'+y+'" stroke="var(--grid)"/><text x="'+(pl-6)+'" y="'+(y+3)+'" text-anchor="end">'+k+'</text></g>';}
+    s.forEach(function(x,i){
+      var x0=pl+i*bw+1, hl=(H-pb-8)*x.low/mx, hb=(H-pb-8)*x.blocked/mx;
+      svg+='<rect x="'+x0+'" y="'+(H-pb-hl)+'" width="'+(bw-2)+'" height="'+hl+'" fill="var(--gray)"><title>'+x.date+' 1~2점 '+x.low+'건, 막힘 '+x.blocked+'건</title></rect>';
+      if(hb) svg+='<rect x="'+x0+'" y="'+(H-pb-hb)+'" width="'+(bw-2)+'" height="'+hb+'" fill="var(--orange)"/>';
+      if((s.length-1-i)%7===0) svg+='<text class="axis" x="'+(x0+bw/2)+'" y="'+(H-6)+'" text-anchor="middle" fill="var(--muted)" font-size="10">'+x.date.slice(5).replace('-','/')+'</text>';
+    });
+    svg+='</svg>';
+    var tl=s.reduce(function(a,x){return a+x.low},0), tb=s.reduce(function(a,x){return a+x.blocked},0);
+    h+='<div class="legend"><span><i style="background:var(--gray)"></i>1~2점 '+tl+'건</span><span><i style="background:var(--orange)"></i>막힘 '+tb+'건</span></div><div class="chart">'+svg+'</div>';
+  }
+  var hs=(B.history||[]).slice().reverse();
+  if(hs.length){
+    h+='<table class="tbl" style="margin-top:10px"><tr><th>실행일</th><th>리뷰 판단</th><th>새 1~2점</th><th>시범(가상)</th><th>실패</th></tr>'+hs.slice(0,7).map(function(x){
+      return '<tr><td class="d">'+esc(x.date)+'</td><td>'+esc(x.status||'-')+'</td><td>'+(x.low_new==null?'-':x.low_new)+'</td><td>'+esc(x.pilot||'-')+'</td><td>'+(esc((x.failures||[]).join(', '))||'-')+'</td></tr>'}).join('')+'</table>';
+  }
+  h+=src('4.1과 같은 단어 규칙, 실행 기록은 data/history 의 날짜별 집계', 'Google Play 공개 리뷰, 원문 없이 건수만');
+  $('hist').innerHTML=h;
+})();
+</script>
+</body>
+</html>

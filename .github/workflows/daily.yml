@@ -1,0 +1,57 @@
+name: 아침 점검
+
+on:
+  schedule:
+    - cron: "0 22 * * *"  # 매일 07:00 KST
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: morning-brief
+  cancel-in-progress: false
+
+jobs:
+  brief:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install -r requirements.txt
+      - name: 테스트
+        run: python -m pytest -q
+      - name: 브리핑 만들기
+        id: run
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          TZ: Asia/Seoul
+        run: |
+          set +e
+          python -m brief.main
+          code=$?
+          if [ $code -eq 3 ]; then
+            # 리뷰 원문이 파일에 들어갔으면 아무것도 남기지 않는다
+            git checkout -- data docs
+            git clean -fdq data docs
+          fi
+          echo "code=$code" >> "$GITHUB_OUTPUT"
+      - name: 원문 미저장 검사(실제 리뷰와 대조)
+        if: steps.run.outputs.code == '0'
+        env:
+          LIVE_REVIEWS: "1"
+        run: python -m pytest -q tests/test_pipeline.py -k "live or review_fields"
+      - name: 커밋
+        if: steps.run.outputs.code != '3'
+        run: |
+          git config user.name "morning-brief-bot"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add docs data
+          git diff --cached --quiet || git commit -m "아침 점검 $(TZ=Asia/Seoul date +%F)"
+          git push
+      - name: 실패 표시
+        if: steps.run.outputs.code != '0'
+        run: exit 1
