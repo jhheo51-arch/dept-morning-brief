@@ -154,7 +154,7 @@ def rule_promos(rows, today):
         else:
             phase = f"진행 중, 종료 D-{(e - today).days}"
         warns = []
-        is_done = any(w in vmd for w in done)
+        is_done = I.is_done(vmd, done)
         if not is_done and (s - today).days <= ready:
             warns.append(f"VMD {vmd or '상태 미기재'}" + (f"(시작 D-{(s - today).days}, 기준 D-{ready})" if s > today
                                                      else "(이미 시작)"))
@@ -191,31 +191,35 @@ def rule_tasks(rows, today):
         name = str(r["업무"] or "").strip()
         if not name:
             raise I.InputError(f"{I.where(r)} '업무' 값이 비어 있습니다")
-        due = I.to_day(r["기한"], r, "기한", today)
+        due = I.to_day(r["기한"], r, "기한", today) if str(r.get("기한") or "").strip() else None
         state = str(r.get("상태") or "").strip()
-        base = {"name": name, "due": due.isoformat(), "state": state, "owner": str(r.get("담당") or "").strip(),
+        base = {"name": name, "due": due.isoformat() if due else None, "state": state, "owner": str(r.get("담당") or "").strip(),
                 "promo": str(r.get("관련 행사") or "").strip(), "memo": str(r.get("메모") or "").strip()}
-        if any(w in state for w in done):
+        if I.is_done(state, done):
             fin = I.to_day(r["완료일"], r, "완료일", today) if r.get("완료일") else None
             closed.append(dict(base, done_on=fin.isoformat() if fin else None))
             continue
-        left = (due - today).days
-        if left < 0:
+        left = (due - today).days if due else None
+        if left is None:  # 기한을 아직 못 정한 일은 경고 없이 맨 뒤에 둔다
+            phase, warn = "기한 없음", False
+        elif left < 0:
             phase, warn = f"기한 지남 {-left}일", True
         elif left == 0:
             phase, warn = "오늘 마감", True
         else:
             phase, warn = f"D-{left}", False
-        items.append(dict(base, phase=phase, left=left, warn=warn, soon=left <= soon))
-    items.sort(key=lambda x: (x["due"], x["name"]))
-    late = [i for i in items if i["left"] < 0]
+        items.append(dict(base, phase=phase, left=left, warn=warn, soon=left is not None and left <= soon))
+    items.sort(key=lambda x: (x["due"] is None, x["due"] or "", x["name"]))
+    dated = [i for i in items if i["left"] is not None]
+    late = [i for i in dated if i["left"] < 0]
     return {
         "rule": "업무 목록",
         "items": items,
         "closed_now": closed,
         "overdue": len(late),
-        "due_today": sum(1 for i in items if i["left"] == 0),
-        "soon": sum(1 for i in items if 0 < i["left"] <= soon),
+        "due_today": sum(1 for i in dated if i["left"] == 0),
+        "soon": sum(1 for i in dated if 0 < i["left"] <= soon),
+        "no_due": len(items) - len(dated),
         "status": "확인 필요" if any(i["warn"] for i in items) else "평소",
         "rule_text": f"기한이 지났거나 오늘이면 확인 필요, {soon}일 안이면 앞에 표시, "
                      f"상태에 {', '.join(done)} 이 있으면 보관",
@@ -235,6 +239,49 @@ def merge_task_archive(archive, tasks, today):
     cut = (today - dt.timedelta(days=keep)).isoformat()
     return sorted((a for a in box.values() if a["done_on"] >= cut), key=lambda a: (a["done_on"], a["name"]),
                   reverse=True)
+
+
+# 행사 경고 종류별로 업무 이름에 이 말이 있으면 그 경고를 다루는 업무로 본다
+TASK_LINK = {"VMD": ("VMD", "진열"), "알릴 길": ("알릴 길", "채널", "푸시", "문자", "배너"),
+             "마감": ("마감 안내", "마감")}
+
+
+def _warn_kind(w):
+    return "VMD" if w.startswith("VMD") else "알릴 길" if w.startswith("알릴 길") else "마감" if "마감" in w else None
+
+
+def link_tasks(promos, tasks, archive):
+    """행사 경고와 업무를 잇는다. 관련 행사가 같고 업무 이름에 경고 종류의 말이 있으면 같은 일로 본다.
+    끝낸 업무가 있으면 그 경고는 '처리함'으로 내리고, 열린 업무가 있으면 행사 줄에 그 업무와 기한을 붙인다."""
+    if not promos or not tasks:
+        return promos
+    open_ = tasks["items"]
+    done = list(tasks.get("closed_now", [])) + [a for a in archive or []
+                                                if (a["name"], a["due"]) not in {(c["name"], c["due"]) for c in
+                                                                                 tasks.get("closed_now", [])}]
+
+    def match(t, promo, kind):
+        rel = t.get("promo") or ""
+        return rel and (rel == promo or rel in promo or promo in rel) and any(w in t["name"] for w in TASK_LINK[kind])
+    for i in promos["items"]:
+        keep, handled, linked = [], [], []
+        for w in i["warns"]:
+            kind = _warn_kind(w)
+            fin = next((t for t in done if kind and match(t, i["name"], kind)), None)
+            if fin:
+                handled.append(f"{w.split('(')[0]}: 업무 '{fin['name']}' 완료로 처리함")
+                continue
+            keep.append(w)
+            for t in open_:
+                if kind and match(t, i["name"], kind):
+                    line = f"업무 '{t['name']}' {t['phase']}" + (f", {t['owner']}" if t["owner"] else "")
+                    if line not in linked:
+                        linked.append(line)
+        i["warns"], i["handled"], i["tasks"] = keep, handled, linked
+    promos["items"].sort(key=lambda x: (not x["warns"], x["start"]))
+    promos["warn_count"] = sum(1 for i in promos["items"] if i["warns"])
+    promos["status"] = "확인 필요" if promos["warn_count"] else "평소"
+    return promos
 
 
 def rule_promo_results(promo_rows, sales_rows, today):
@@ -600,7 +647,7 @@ def rule_field(review, calendar, log=None, today=None, touch=None):
 
 
 # 주간 정리
-def week_summary(today, out, field_log=None):
+def week_summary(today, out, field_log=None, archive=None):
     """지난 7일(어제까지)을 한 장으로. 오늘 판단 결과와 현장 기록에서 묶는다. 새로 세는 것은 기간 합과 일수뿐."""
     end = today - dt.timedelta(days=1)
     start = end - dt.timedelta(days=6)
@@ -635,6 +682,13 @@ def week_summary(today, out, field_log=None):
         lines = [f"{i['name']} {i['start'][5:]} 시작" + (f", {', '.join(i['warns'])}" if i["warns"] else "")
                  for i in nxt]
         sections.append({"title": "다음 7일 시작 행사", "lines": lines or ["없음"]})
+    tasks = out.get("tasks")
+    if tasks and not tasks.get("stale"):
+        fin = [a for a in archive or [] if a.get("done_on") and start.isoformat() <= a["done_on"] <= today.isoformat()]
+        lines = [f"끝낸 업무 {len(fin)}건, 남은 업무 {len(tasks['items'])}건(기한 지남 {tasks['overdue']}건)"]
+        lines += [f"{a['done_on'][5:]} 완료: {a['name']}" for a in sorted(fin, key=lambda a: a["done_on"])]
+        lines += [f"남음: {t['name']} ({t['phase']})" for t in tasks["items"] if t["warn"]]
+        sections.append({"title": "업무", "lines": lines})
     if field_log is not None:
         week = []
         for r in field_log:
@@ -712,6 +766,12 @@ def consult_drafts(today, out):
         add(f"{t['place']} 담당", f"{md(t['date'])} {t['metric']}{v}: {t['value']:,.0f}, "
             f"평소(직전 같은 요일 평균) {t['base']:,} 대비 {t['change_pct']:+}%",
             "기록이 빠진 것인지 실제로 달라진 것인지 확인해 주세요.")
+    me = C.TASKS.get("me", ["나", "본인"])
+    soon = C.TASKS.get("soon_days", 3)
+    for t in (out.get("tasks") or {}).get("items", []):
+        if t["owner"] and t["owner"] not in me and t["left"] is not None and t["left"] <= soon:
+            add(f"{t['owner']} 담당", f"업무 '{t['name']}': {t['phase']}(기한 {md(t['due'])})",
+                "진행 상황과 막힌 부분을 알려 주세요.")
     review = out.get("review")
     if review and review["status"] == "확인 필요":
         add(app, f"새 1~2점 리뷰 {review['low_new']}건, 앱이 막혔다는 리뷰 {review['blocked_new']}건",
@@ -726,7 +786,8 @@ def consult_drafts(today, out):
     drafts.sort(key=lambda d: -d["count"])
     return {"rule": "협의 초안", "drafts": drafts,
             "rule_text": "VMD 경고는 VMD 담당, 알릴 길과 마감 안내는 채널 담당, 성과가 낮은 행사는 둘 다(같은 행사는 한 줄로), "
-                         "구분 매출 경고는 그 구분 영업 담당, 접점 숫자 표시는 그 접점 담당, 리뷰 확인 필요는 앱 운영 담당",
+                         "구분 매출 경고는 그 구분 영업 담당, 접점 숫자 표시는 그 접점 담당, 리뷰 확인 필요는 앱 운영 담당, "
+                         "남이 맡은 업무 중 기한이 지났거나 며칠 안 남은 것은 그 담당",
             "source": "오늘 판단 결과. 요청 문장은 정해진 목록이며 보내기 전에 담당자가 다듬습니다"}
 
 

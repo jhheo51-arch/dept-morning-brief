@@ -148,6 +148,8 @@ if(window.BRIEF&&!window.BRIEF.offline){var f=document.createElement('link');f.r
   $('title').textContent=B.date.replace(/-/g,'. ')+' ('+DOW[(d.getDay()+6)%7]+') 아침 점검';
   $('runat').textContent='실행 '+B.run_at.replace('T',' ').slice(0,16)+' KST';
   var SAMPLE=B.mode!=='real', VT=SAMPLE?'<span class="v">가상 데이터</span>':'';
+  // 오늘 읽기에 실패해 지난 결과를 보여 주는 블록 표시
+  var OLD=function(x){return x&&x.stale?'<span class="tag warn">'+esc(x.stale_from||'지난')+' 결과, 오늘 읽기 실패</span>':''};
   document.title=(B.store_name?B.store_name+' ':'')+'아침 점검';
   $('brand').textContent=SAMPLE?'백화점 마케팅 아침 점검 | 개인 포트폴리오 시연':'백화점 마케팅 아침 점검 | '+(B.store_name||'내 점포');
   $('how').textContent=SAMPLE
@@ -174,7 +176,7 @@ if(window.BRIEF&&!window.BRIEF.offline){var f=document.createElement('link');f.r
   }
 
   // 매출 현황
-  var S=B.sales, h='<h3>매출 현황'+VT+'</h3>';
+  var S=B.sales, h='<h3>매출 현황'+VT+OLD(S)+'</h3>';
   if(S){
     var t=S.total, m=S.mtd, w=S.last7;
     h+='<div class="sub">'+esc(S.date)+' 마감 기준'+(S.stale_days>1?' ('+S.stale_days+'일 전 자료)':'')
@@ -211,13 +213,15 @@ if(window.BRIEF&&!window.BRIEF.offline){var f=document.createElement('link');f.r
   $('sales').innerHTML=h;
 
   // 행사 점검
-  var Pr=B.promos; h='<h3>프로모션과 행사 점검'+VT+'</h3>';
+  var Pr=B.promos; h='<h3>프로모션과 행사 점검'+VT+OLD(Pr)+'</h3>';
   if(Pr){
     h+='<div class="sub">진행 중 '+Pr.running+'건, 7일 안 시작 '+Pr.upcoming+'건<span class="tag '+(Pr.warn_count?'warn':'ok')+'">'+(Pr.warn_count?'경고 '+Pr.warn_count+'건':'평소')+'</span></div>';
     if(Pr.items.length){
       h+='<table class="tbl"><tr><th>행사</th><th>단계</th><th>VMD와 알릴 길</th></tr>'+Pr.items.map(function(i){
         return '<tr><td><b>'+esc(i.name)+'</b>'+(i.place?'<br><span class="sub">'+esc(i.place)+(i.owner?', '+esc(i.owner):'')+'</span>':'')+'</td><td class="d">'+esc(i.phase)+'<br><span class="sub">'+esc(i.start.slice(5).replace('-','/'))+'~'+esc(i.end.slice(5).replace('-','/'))+'</span></td><td>'
-          +'VMD '+(esc(i.vmd)||'-')+'<br>'+(esc(i.channel)||'알릴 길 -')+i.warns.map(function(x){return '<span class="warnline">'+esc(x)+'</span>'}).join('')+'</td></tr>'}).join('')+'</table>';
+          +'VMD '+(esc(i.vmd)||'-')+'<br>'+(esc(i.channel)||'알릴 길 -')+i.warns.map(function(x){return '<span class="warnline">'+esc(x)+'</span>'}).join('')
+          +(i.tasks||[]).map(function(x){return '<br><span class="sub">'+esc(x)+'</span>'}).join('')
+          +(i.handled||[]).map(function(x){return '<br><span class="sub">'+esc(x)+'</span>'}).join('')+'</td></tr>'}).join('')+'</table>';
     } else h+='<div class="empty">진행 중이거나 7일 안에 시작하는 행사가 없습니다.</div>';
     h+=src(Pr.rule+' ('+esc(Pr.rule_text)+')', Pr.source);
   } else h+=missing('promotions','행사')||failed('행사');
@@ -234,7 +238,7 @@ if(window.BRIEF&&!window.BRIEF.offline){var f=document.createElement('link');f.r
   $('promos').innerHTML=h;
 
   // 업무 목록
-  var Tk=B.tasks, Ar=B.task_archive||[]; h='<h3>마케팅 업무'+VT+'</h3>';
+  var Tk=B.tasks, Ar=B.task_archive||[]; h='<h3>마케팅 업무'+VT+OLD(Tk)+'</h3>';
   var md=function(x){return x?esc(x.slice(5).replace('-','/')):'-'};
   if(Tk){
     h+='<div class="sub">열린 업무 '+Tk.items.length+'건, 기한 지남 '+Tk.overdue+'건, 오늘 마감 '+Tk.due_today+'건<span class="tag '+(Tk.status==='확인 필요'?'warn':'ok')+'">'+esc(Tk.status)+'</span></div>';
@@ -257,7 +261,7 @@ if(window.BRIEF&&!window.BRIEF.offline){var f=document.createElement('link');f.r
   };
 
   // 접점 숫자
-  var Tc=B.touch; h='<h3>접점 숫자'+VT+'</h3><div class="sub">문화센터, 라운지, 상담실처럼 매일 세는 숫자</div>';
+  var Tc=B.touch; h='<h3>접점 숫자'+VT+OLD(Tc)+'</h3><div class="sub">문화센터, 라운지, 상담실처럼 매일 세는 숫자</div>';
   if(Tc){
     h+='<div class="sub">'+(Tc.flagged.length?'<span class="tag warn">평소와 다름 '+Tc.flagged.length+'건</span>':'<span class="tag ok">평소</span>')+'</div>';
     if(Tc.items.length){
@@ -300,9 +304,9 @@ if(window.BRIEF&&!window.BRIEF.offline){var f=document.createElement('link');f.r
   });
 
   // 4.1
-  var r=B.review; h='<h3>고객 접점 알림</h3>';
+  var r=B.review; h='<h3>고객 접점 알림'+OLD(r)+'</h3>';
   if(r){
-    h+='<div class="sub">'+esc(r.app_name||'앱')+' 1~2점 리뷰, '+esc(r.since)+' 이후'+(r.stale?' (지난 결과)':'')
+    h+='<div class="sub">'+esc(r.app_name||'앱')+' 1~2점 리뷰, '+esc(r.since)+' 이후'
       +'<span class="tag '+(r.status==='확인 필요'?'warn':'ok')+'">'+esc(r.status)+'</span></div>';
     h+='<div class="kpis"><div class="kpi '+(r.low_new?'o':'g')+'"><div class="l">새 1~2점</div><div class="n">'+r.low_new+'<small>건</small></div><div class="s">4주 하루 평균 '+r.avg28_per_day+'건, 차이 '+r.diff_vs_avg+'</div></div>'
       +'<div class="kpi '+(r.blocked_new?'o':'g')+'"><div class="l">새 막힘</div><div class="n">'+r.blocked_new+'<small>건</small></div><div class="s">혜택 단어와 로그인, 실행 오류 단어가 함께</div></div>'
@@ -332,7 +336,7 @@ if(window.BRIEF&&!window.BRIEF.offline){var f=document.createElement('link');f.r
   $('c44').innerHTML=h;
 
   // 4.2
-  var c=B.calendar; h='<h3>이번 주 집객 달력</h3><div class="sub">날짜별 상황, 맞는 시범, 알릴 길과 시간. 알릴 길은 '+esc(c?c.channel_note:'')+'</div>';
+  var c=B.calendar; h='<h3>이번 주 집객 달력'+OLD(c)+'</h3><div class="sub">날짜별 상황, 맞는 시범, 알릴 길과 시간. 알릴 길은 '+esc(c?c.channel_note:'')+'</div>';
   if(c){
     var nf=0, P={}, PN=c.pilot_names||{}; Object.keys(PN).forEach(function(k){P[k]=k+'번 '+PN[k]});
     h+='<div class="scroll"><table class="tbl"><tr><th>날짜</th><th>상황</th><th>맞는 시범</th><th>알릴 길 후보</th><th>보낼 시간 후보</th><th>혜택 유형</th><th>근거</th></tr>'
@@ -370,7 +374,7 @@ if(window.BRIEF&&!window.BRIEF.offline){var f=document.createElement('link');f.r
   $('plan').innerHTML=h;
 
   // 4.3
-  var p=B.pilot; h='<h3>시범 점검'+(p&&p.virtual?'<span class="v">가상 데이터</span>':'')+'</h3>';
+  var p=B.pilot; h='<h3>시범 점검'+(p&&p.virtual?'<span class="v">가상 데이터</span>':'')+OLD(p)+'</h3>';
   if(p){
     h+='<div class="sub">1번 시범(평일 저녁 푸시), 시작 '+esc(p.start)+(p.virtual?'(가정값)':'')+', '+(p.check_day?'<span class="tag warn">'+esc(p.week_label)+'</span>':esc(p.week_label||''))+'</div>';
     if(p.sent){

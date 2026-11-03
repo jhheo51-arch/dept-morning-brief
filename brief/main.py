@@ -71,7 +71,7 @@ def run(now=None, root=ROOT, review_fetch=None, weather_fetch=None, summarizer=N
                          "last_success": last_ok.get(key)})
         old = prev.get(key)
         if old:
-            old = dict(old, stale=True)
+            old = dict(old, stale=True, stale_from=last_ok.get(key))
         return old
 
     def table(key):
@@ -109,6 +109,8 @@ def run(now=None, root=ROOT, review_fetch=None, weather_fetch=None, summarizer=N
         archive = judge.merge_task_archive(archive, out["tasks"], today)
         archive_path.write_text(json.dumps({"note": "상태에 완료를 적은 업무. 업무와 기한이 같으면 같은 업무로 봄",
                                             "items": archive}, ensure_ascii=False, indent=1), encoding="utf-8")
+    if out["tasks"] and out["promos"] and not out["promos"].get("stale"):
+        out["promos"] = judge.link_tasks(out["promos"], out["tasks"], archive)
 
     # 4.1
     if C.APP_ID and not C.OFFLINE:
@@ -182,7 +184,7 @@ def run(now=None, root=ROOT, review_fetch=None, weather_fetch=None, summarizer=N
         "task_archive": archive,
     }
     try:
-        brief["weekly"] = judge.week_summary(today, out, log)
+        brief["weekly"] = judge.week_summary(today, out, log, archive)
     except I.InputError as e:
         brief["weekly"] = fallback("weekly", e)
     try:

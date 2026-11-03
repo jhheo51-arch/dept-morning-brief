@@ -16,7 +16,7 @@ SCHEMAS = {
     "pilot_weekly": (["주차", "그룹", "회원수", "방문 횟수"], ["수신 거부"]),
     "field_log": (["날짜", "접점"], ["결과", "메모"]),
     "touchpoint_daily": (["날짜", "접점", "지표", "값"], ["메모"]),
-    "tasks": (["업무", "기한"], ["상태", "담당", "관련 행사", "완료일", "메모"]),
+    "tasks": (["업무"], ["기한", "상태", "담당", "관련 행사", "완료일", "메모"]),
 }
 HELP = {
     "sales": {"날짜": "매출일(2026-11-01)", "구분": "전체, 식품, 패션처럼 보고 싶은 단위. '전체'가 없으면 나머지를 더함",
@@ -33,7 +33,7 @@ HELP = {
     "touchpoint_daily": {"날짜": "집계한 날", "접점": "문화센터, 우수고객 라운지, 고객 상담실 등",
                          "지표": "수강 신청, 이용 수, 문의 앱 혜택처럼 접점 안에서 같은 이름으로", "값": "그날 숫자(건, 명)",
                          "메모": "자유롭게"},
-    "tasks": {"업무": "할 일 한 줄(예: 주말 행사 문자 문구 확정)", "기한": "끝낼 날(2026-11-07)",
+    "tasks": {"업무": "할 일 한 줄(예: 주말 행사 문자 문구 확정)", "기한": "끝낼 날(2026-11-07 또는 11/07, 비워 두면 기한 없음)",
               "상태": "비우면 할 일. '완료'를 적으면 보관 목록으로 옮김", "담당": "담당자나 협력 부서",
               "관련 행사": "promotions 파일의 행사명", "완료일": "끝낸 날, 비우면 처음 완료로 본 날",
               "메모": "자유롭게"},
@@ -46,6 +46,10 @@ MONEY = {"sales": ["매출", "목표", "전년"]}
 UNIT_HEAD = re.compile(r"^(.*?)\s*[(\[]\s*(천\s*원|백만\s*원|만\s*원|억\s*원|원)\s*[)\]]$")
 # 한 칸에 적힌 값을 표준 열 두 개로 나누는 열(행사 기간 '11/04~11/10')
 SPLIT = {"promotions": {"기간": ("시작일", "종료일")}}
+BLANK_NUM = {"-", "–", "—", "－", "N/A", "n/a", "해당없음"}
+# 완료 단어 앞뒤에 이런 말이 붙으면 끝나지 않은 것으로 본다('미완료', '완료 예정', '확정 대기', '끝나면 보고')
+NOT_DONE_BEFORE = ("미", "未", "아직", "덜")
+NOT_DONE_AFTER = ("예정", "대기", "필요", "전", "중", "나면", "못", "안", "않", "아님", "보류", "?")
 RANGE = re.compile(r"(.+?)\s*(?:~|∼|〜|～|–|—|\s-\s|부터)\s*(.+?)(?:\s*까지)?")
 
 
@@ -195,12 +199,28 @@ def unit_note(rows):
     return ", ".join(f"{', '.join(cs)} 열을 {u} 단위로 읽어 원으로 바꿈" for u, cs in by.items() if u != "원")
 
 
+def is_done(text, words):
+    """상태 칸이 끝난 일인지. 완료 단어가 있어도 앞뒤에 '미', '예정', '대기' 같은 말이 붙으면 끝나지 않은 것으로 본다.
+    애매하면 끝나지 않은 쪽(경고가 나오는 쪽)으로 읽는다. 괄호 속 날짜 메모는 보지 않는다('완료(10/30)')."""
+    s = str(text or "").strip()
+    for w in words:
+        i = s.find(w)
+        while i >= 0:
+            before, after = s[:i], re.sub(r"\([^)]*\)", "", s[i + len(w):])
+            if not before.endswith(NOT_DONE_BEFORE) and "아직" not in before \
+                    and not any(b in after for b in NOT_DONE_AFTER):
+                return True
+            i = s.find(w, i + 1)
+    return False
+
+
 def where(row):
     return f"{row['_file']} {row['_row']}행"
 
 
 DATE = re.compile(r"(\d{4})\s*(?:[-./]|년)\s*(\d{1,2})\s*(?:[-./]|월)\s*(\d{1,2})\s*일?\.?")
 DATE8 = re.compile(r"(\d{4})(\d{2})(\d{2})")
+DATE6 = re.compile(r"(\d{2})\s*[./-]\s*(\d{1,2})\s*[./-]\s*(\d{1,2})\.?")  # '26.11.07'
 MONTH_DAY = re.compile(r"(\d{1,2})\s*(?:[-./]|월)\s*(\d{1,2})\s*일?\.?")
 TAIL = re.compile(r"\s*(?:\([^)]*\)|[월화수목금토일]요일|\d{1,2}:\d{2}(?::\d{2})?)\s*$")
 
@@ -220,10 +240,16 @@ def to_date(v, row, col):
     if isinstance(v, dt.date):
         return v
     s = str(int(v)) if isinstance(v, (int, float)) and not isinstance(v, bool) else _strip_tail(str(v or "").strip())
+    if not s:
+        raise InputError(f"{where(row)} '{col}' 값이 비어 있습니다")
     m = DATE.fullmatch(s) or DATE8.fullmatch(s)
+    m6 = None if m else DATE6.fullmatch(s)
     try:
         if m:
             return dt.date(*map(int, m.groups()))
+        if m6:
+            y, mo, d = map(int, m6.groups())
+            return dt.date(2000 + y, mo, d)
     except ValueError:
         pass
     raise InputError(f"{where(row)} '{col}' 값 '{v}'을 날짜로 읽지 못했습니다(예: 2026-11-01)")
@@ -243,7 +269,7 @@ def _near_year(month, day, near):
 
 
 def _one(s, near, row, col):
-    if DATE.fullmatch(s) or DATE8.fullmatch(s):
+    if DATE.fullmatch(s) or DATE8.fullmatch(s) or DATE6.fullmatch(s):
         return to_date(s, row, col)
     m = MONTH_DAY.fullmatch(s)
     if not m:
@@ -255,6 +281,8 @@ def to_day(v, row, col, today):
     """업무 기한처럼 연도를 빼고 적기 쉬운 날짜. '11/07', '11월 7일'은 오늘과 가까운 해로 읽는다."""
     if isinstance(v, (dt.date, dt.datetime)):
         return to_date(v, row, col)
+    if not str(v or "").strip():
+        raise InputError(f"{where(row)} '{col}' 값이 비어 있습니다")
     try:
         return _one(_strip_tail(str(v or "").strip()), today, row, col)
     except ValueError:
@@ -294,12 +322,24 @@ def to_num(v, row, col, required=True):
     scale = (row.get("_scale") or {}).get(col, 1)
     if isinstance(v, (int, float)):
         return float(v) * scale
-    m = re.fullmatch(r"(-?\d+(?:\.\d+)?)(천원|백만원|만원|억원|원|명|회|건)?", re.sub(r"[,\s]", "", str(v)))
+    t = re.sub(r"[,\s]", "", str(v))
+    if t in BLANK_NUM:  # 사내 파일에서 '없음'을 '-'로 적는 칸
+        if required:
+            raise InputError(f"{where(row)} '{col}' 값이 비어 있습니다('{v}')")
+        return None
+    sign = 1
+    if re.fullmatch(r"\(.+\)", t):  # 회계 표기 (1,200) 은 음수
+        sign, t = -1, t[1:-1]
+    if t[:1] == "△":  # △1,200 도 음수
+        sign, t = -sign, t[1:]
+    m = re.fullmatch(r"(-?\d+(?:\.\d+)?)(천원|백만원|만원|억원|원|백만|천|만|억|명|회|건)?", t)
     if not m:
         raise InputError(f"{where(row)} '{col}' 값 '{v}'을 숫자로 읽지 못했습니다")
-    n, unit = float(m.group(1)), m.group(2)
-    if unit in UNITS:  # 칸에 '1,234천원'처럼 단위가 적혀 있으면 그 단위를 따른다
+    n, unit = float(m.group(1)) * sign, m.group(2)
+    if unit in UNITS:  # 칸에 '1,234천원', '1.2억'처럼 단위가 적혀 있으면 그 단위를 따른다
         return n * UNITS[unit]
+    if unit and unit + "원" in UNITS:
+        return n * UNITS[unit + "원"]
     return n * scale
 
 

@@ -427,3 +427,84 @@ def test_task_archive_keeps_done_after_row_is_deleted(tmp_path):
     write_csv(inp, "tasks", ["업무", "기한", "상태"], [["문구 확정", "2026-11-07", ""]])
     b = main.run(NOW + dt.timedelta(days=1), tmp_path, None, lambda d: {})
     assert [a["name"] for a in b["task_archive"]] == ["결과 보고"]
+
+
+def test_done_words_ignore_not_yet_phrases():
+    words = ["완료", "확정", "끝", "취소"]
+    for t in ["완료", "완료(10/30)", "설치완료", "확정"]:
+        assert I.is_done(t, words), t
+    for t in ["미완료", "완료 예정(11/6)", "미확정", "확정 대기", "끝나면 보고", "취소 예정", "아직 완료 안 됨", ""]:
+        assert not I.is_done(t, words), t
+
+
+def test_vmd_not_done_still_warns(tmp_path):
+    write_csv(tmp_path, "promotions", ["행사명", "시작일", "종료일", "알릴 길", "VMD 상태"],
+              [["A", "2026-11-06", "2026-11-09", "앱 푸시", "미완료"], ["B", "2026-11-06", "2026-11-09", "앱 푸시", "완료 예정(11/6)"],
+               ["C", "2026-11-06", "2026-11-09", "앱 푸시", "완료(11/04)"]])
+    p = judge.rule_promos(I.read_table("promotions", tmp_path, TODAY), TODAY)
+    assert {i["name"]: bool(i["warns"]) for i in p["items"]} == {"A": True, "B": True, "C": False}
+
+
+def test_task_without_due_goes_last(tmp_path):
+    write_csv(tmp_path, "tasks", ["업무", "기한", "상태"], [["언젠가 할 일", "", ""], ["문구 확정", "11/06", ""],
+                                                        ["끝낼 일", "", "완료 예정"]])
+    t = judge.rule_tasks(I.read_table("tasks", tmp_path, TODAY), TODAY)
+    assert [(i["name"], i["phase"]) for i in t["items"]] == [("문구 확정", "D-1"), ("끝낼 일", "기한 없음"),
+                                                            ("언젠가 할 일", "기한 없음")]
+    assert t["no_due"] == 2 and t["status"] == "평소" and t["closed_now"] == []
+    archive = judge.merge_task_archive([], t, TODAY)
+    assert archive == []
+
+
+def test_empty_date_message_has_no_none():
+    with pytest.raises(I.InputError, match="'시작일' 값이 비어 있습니다"):
+        I.to_date(None, {"_file": "promotions.csv", "_row": 2}, "시작일")
+
+
+def test_numbers_in_office_notation():
+    r = {"_file": "sales.csv", "_row": 2}
+    assert I.to_num("-", r, "목표", required=False) is None
+    assert I.to_num("(1,200)", r, "매출") == -1200 and I.to_num("△1,200", r, "매출") == -1200
+    assert I.to_num("1.2억", r, "매출") == 120_000_000 and I.to_num("350만", r, "매출") == 3_500_000
+    assert I.to_date("26.11.07", r, "날짜") == dt.date(2026, 11, 7)
+    with pytest.raises(I.InputError, match="비어 있습니다"):
+        I.to_num("-", r, "매출")
+
+
+def test_tasks_link_to_promo_warnings(tmp_path):
+    write_csv(tmp_path, "promotions", ["행사명", "시작일", "종료일", "알릴 길", "VMD 상태"],
+              [["사은 행사", "2026-11-06", "2026-11-09", "", "요청 전"]])
+    p = judge.rule_promos(I.read_table("promotions", tmp_path, TODAY), TODAY)
+    write_csv(tmp_path, "tasks", ["업무", "기한", "상태", "담당", "관련 행사"],
+              [["사은 행사 VMD 요청서 보내기", "11/04", "완료", "", "사은 행사"],
+               ["사은 행사 알릴 길 정하기", "11/06", "", "채널팀", "사은 행사"]])
+    t = judge.rule_tasks(I.read_table("tasks", tmp_path, TODAY), TODAY)
+    p = judge.link_tasks(p, t, [])
+    i = p["items"][0]
+    assert i["warns"] == ["알릴 길 미정"] and "완료로 처리함" in i["handled"][0]
+    assert i["tasks"] == ["업무 '사은 행사 알릴 길 정하기' D-1, 채널팀"]
+    c = judge.consult_drafts(TODAY, {"tasks": t})
+    assert [d["to"] for d in c["drafts"]] == ["채널팀 담당"]
+    w = judge.week_summary(TODAY, {"tasks": t}, None, judge.merge_task_archive([], t, TODAY))
+    assert w["sections"][0]["title"] == "업무" and "끝낸 업무 1건" in w["sections"][0]["lines"][0]
+
+
+def test_top_three_folds_many_warnings():
+    out = {"tasks": {"status": "확인 필요", "items": [{"name": "a", "phase": "오늘 마감", "warn": True}]},
+           "promos": {"items": [{"name": "b", "warns": ["알릴 길 미정"]}], "running": 0, "upcoming": 1},
+           "touch": {"flagged": [{"place": "c", "metric": "m", "value": 1, "change_pct": -50}]},
+           "review": {"status": "확인 필요", "low_new": 3, "blocked_new": 1, "low_7d": 5}}
+    top = write.top_three(out)
+    assert len(top) == 3 and top[2] == "그 밖에 확인 필요 2가지(접점 숫자, 앱 리뷰)"
+
+
+def test_stale_block_is_marked(tmp_path):
+    real_mode(tmp_path)
+    inp = tmp_path / "inputs"
+    write_csv(inp, "tasks", ["업무", "기한"], [["문구 확정", "2026-11-07"]])
+    main.run(NOW, tmp_path, None, lambda d: {})
+    write_csv(inp, "tasks", ["업무", "기한"], [["문구 확정", "11월 32일"]])
+    b = main.run(NOW + dt.timedelta(days=1), tmp_path, None, lambda d: {})
+    assert b["tasks"]["stale"] and b["tasks"]["stale_from"] == "2026-11-05"
+    assert "## 업무 (2026-11-05 결과, 오늘 읽기 실패)" in (tmp_path / "output" / "site" / "brief.md").read_text(
+        encoding="utf-8")

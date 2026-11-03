@@ -29,7 +29,7 @@ def _sales_line(s):
 
 
 def top_three(out):
-    """확인 필요 항목을 먼저, 그다음 오늘 할 일. 최대 세 줄."""
+    """확인 필요 항목을 먼저, 그다음 오늘 할 일. 최대 세 줄. 확인 필요가 세 개를 넘으면 두 줄 뒤에 나머지를 종류별로 센다."""
     sales, promos, review, calendar, pilot, field, touch, res = (out.get(k) for k in (
         "sales", "promos", "review", "calendar", "pilot", "field", "touch", "promo_results"))
     urgent, usual = [], []
@@ -37,41 +37,51 @@ def top_three(out):
     if tasks and tasks["status"] == "확인 필요":
         hot = [i for i in tasks["items"] if i["warn"]]
         more = f" 외 {len(hot) - 1}건" if len(hot) > 1 else ""
-        urgent.append(f"업무 {hot[0]['name']}: {hot[0]['phase']}{more}")
+        urgent.append(("업무", f"업무 {hot[0]['name']}: {hot[0]['phase']}{more}"))
     if sales:
-        line = f"매출 {sales['status']}: {_sales_line(sales)}"
+        line = f"매출 {'확인 필요' if sales['parts_flagged'] else sales['status']}: {_sales_line(sales)}"
         if sales["parts_flagged"]:
             line += f". 볼 구분 {', '.join(sales['parts_flagged'][:3])}"
-        (urgent if sales["status"] == "확인 필요" else usual).append(line)
+        # 전체가 평소여도 구분 하나가 기준을 넘으면 확인 필요로 올린다
+        if sales["status"] == "확인 필요" or sales["parts_flagged"]:
+            urgent.append(("매출", line))
+        else:
+            usual.append(line)
     if promos:
         warned = [i for i in promos["items"] if i["warns"]]
         if warned:
             i = warned[0]
             more = f" 외 {len(warned) - 1}건" if len(warned) > 1 else ""
-            urgent.append(f"행사 {i['name']}: {', '.join(i['warns'])}{more}")
+            urgent.append(("행사", f"행사 {i['name']}: {', '.join(i['warns'])}{more}"))
         elif promos["items"]:
             usual.append(f"행사 진행 {promos['running']}건, 7일 안 시작 {promos['upcoming']}건, 경고 없음")
     if res and res["status"] == "확인 필요":
         i = next(i for i in res["items"] if i["flag"])
-        urgent.append(f"행사 성과 {i['name']}: {i['part']} 매출 앞 같은 요일 기간 대비 {i['growth']:+}%")
+        urgent.append(("행사 성과", f"행사 성과 {i['name']}: {i['part']} 매출 앞 같은 요일 기간 대비 {i['growth']:+}%"))
     if touch and touch["flagged"]:
         t = touch["flagged"][0]
         more = f" 외 {len(touch['flagged']) - 1}건" if len(touch["flagged"]) > 1 else ""
-        urgent.append(f"접점 숫자 {t['place']} {t['metric']}: {t['value']:,.0f}, 평소 대비 {t['change_pct']:+}%{more}")
+        urgent.append(("접점 숫자", f"접점 숫자 {t['place']} {t['metric']}: {t['value']:,.0f}, 평소 대비 {t['change_pct']:+}%{more}"))
     if review:
         line = (f"앱 리뷰 {review['status']}: 새 1~2점 {review['low_new']}건, 막힘 {review['blocked_new']}건"
                 f"(지난 7일 1~2점 {review['low_7d']}건)")
-        (urgent if review["status"] == "확인 필요" else usual).append(line)
+        if review["status"] == "확인 필요":
+            urgent.append(("앱 리뷰", line))
+        else:
+            usual.append(line)
     if calendar:
         t = calendar["days"][0]
         what = f"{_pilot_names(t['pilots'])}, {', '.join(t['times'])} {', '.join(t['channels'])}"             if t["pilots"] and t["channels"] else (_pilot_names(t["pilots"]) or "맞는 시범 없음")
         usual.append(f"오늘({', '.join(t['situation'])}) {what}")
     if pilot and pilot.get("check_day"):
-        urgent.append(f"시범 {pilot['week_label']}: {pilot['decision']}" + ("(가상 데이터)" if pilot["virtual"] else ""))
+        urgent.append(("시범", f"시범 {pilot['week_label']}: {pilot['decision']}" + ("(가상 데이터)" if pilot["virtual"] else "")))
     if field and field["items"]:
         i = field["items"][0]
         usual.append(f"현장 {i['place']}: {i['check']}")
-    return (urgent + usual)[:3]
+    if len(urgent) > 3:
+        rest = list(dict.fromkeys(k for k, _ in urgent[2:]))
+        return [t for _, t in urgent[:2]] + [f"그 밖에 확인 필요 {len(urgent) - 2}가지({', '.join(rest)})"]
+    return ([t for _, t in urgent] + usual)[:3]
 
 
 def template_summary(out):
@@ -152,7 +162,8 @@ def brief_markdown(b):
     lines += ["", "## 요약", b["summary"], ""]
     t = b.get("tasks")
     if t and t["items"]:
-        lines += ["## 업무"] + [f"- {i['phase']} | {i['name']}" + (f" ({i['owner']})" if i["owner"] else "")
+        head = "## 업무" + (f" ({t.get('stale_from') or '지난'} 결과, 오늘 읽기 실패)" if t.get("stale") else "")
+        lines += [head] + [f"- {i['phase']} | {i['name']}" + (f" ({i['owner']})" if i["owner"] else "")
                                 for i in t["items"][:C.TASKS.get("max_rows", 10)]] + [""]
     if b["failures"]:
         lines += [f"실패: {', '.join(f['step'] for f in b['failures'])}. "

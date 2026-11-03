@@ -38,7 +38,7 @@ def test_full_run_writes_brief_without_raw_text(tmp_path):
     daily = json.loads((tmp_path / "data/history/reviews/daily.json").read_text(encoding="utf-8"))["days"]
     assert len(daily) == 60 and sum(x["low"] for x in daily) == 1 and set(daily[0]) == {"date", "all", "low", "blocked"}
     md = (tmp_path / "docs/brief.md").read_text(encoding="utf-8")
-    assert len(md) < 700  # 한 장, 2분 안에 읽히는 길이
+    assert len(md) < 800  # 한 장, 2분 안에 읽히는 길이
 
 
 def test_leak_guard_detects_planted_text(tmp_path):
