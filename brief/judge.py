@@ -128,11 +128,14 @@ def rule_sales(rows, today):
         "total": t, "mtd": mtd, "last7": last7,
         "parts": parts,
         "parts_flagged": [p["part"] for p in parts if p["flags"]],
-        "status": "확인 필요" if reasons else "평소",
-        "reasons": reasons or [f"전년 대비 {yoy_thr}% 초과, 목표 {tgt_thr}% 이상"],
+        # 세 단계. 전체가 기준을 넘으면 확인 필요, 전체는 괜찮고 구분만 넘으면 구분 확인. 화면, 요약, 기록이 모두 이 값을 쓴다
+        "status": "확인 필요" if reasons else ("구분 확인" if any(p["flags"] for p in parts) else "평소"),
+        "reasons": reasons or [f"전체는 전년 대비 {yoy_thr}% 초과, 목표 {tgt_thr}% 이상"
+                            + (". 기준을 넘은 구분은 아래 표의 볼 점" if any(p["flags"] for p in parts) else "")],
         "series30": series,
         "yoy_alert_pct": yoy_thr, "target_alert_pct": tgt_thr,
         "rule_text": f"어제 또는 최근 7일 전년 대비 {yoy_thr}% 이하, 어제 목표 달성 {tgt_thr}% 미만이면 확인 필요. "
+                     f"전체는 괜찮고 구분 하나라도 같은 기준을 넘으면 구분 확인. "
                      f"어제가 최근 같은 요일 평균의 {partial_pct}% 미만이면 덜 된 집계로 보고 구분 경고를 멈춤",
         "unit_note": I.unit_note(rows),
         "source": _src(rows[0]["_file"]) + (f". {I.unit_note(rows)}" if I.unit_note(rows) else ""),

@@ -15,7 +15,9 @@ def message(b):
 
 
 def send(b, opener=urllib.request.urlopen):
-    """보냈으면 True, 주소가 없으면 False. 알림 실패는 점검 결과를 막지 않도록 호출한 쪽에서 잡는다."""
+    """보냈으면 True, 주소가 없거나 offline이면 False. 알림 실패는 점검 결과를 막지 않도록 호출한 쪽에서 잡는다."""
+    if C.OFFLINE:  # offline은 인터넷에 전혀 나가지 않는다는 약속이라 웹훅도 막는다
+        return False
     url = os.environ.get(C.WEBHOOK_ENV or "", "") if C.WEBHOOK_ENV else ""
     if not url:
         return False

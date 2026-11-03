@@ -28,6 +28,13 @@ def _sales_line(s):
     return ", ".join(bits)
 
 
+def _parts_line(s, n=2):
+    """기준을 넘은 구분을 숫자와 함께. 예: 식품 전년 대비 -10.9%, F&B 목표 달성 85.0%"""
+    bits = [f"{p['part']} {p['flags'][0].split('(')[0]}" for p in s["parts"] if p["flags"]][:n]
+    more = len(s["parts_flagged"]) - len(bits)
+    return ", ".join(bits) + (f" 외 {more}개" if more > 0 else "")
+
+
 def top_three(out):
     """확인 필요 항목을 먼저, 그다음 오늘 할 일. 최대 세 줄. 확인 필요가 세 개를 넘으면 두 줄 뒤에 나머지를 종류별로 센다."""
     sales, promos, review, calendar, pilot, field, touch, res = (out.get(k) for k in (
@@ -39,12 +46,14 @@ def top_three(out):
         more = f" 외 {len(hot) - 1}건" if len(hot) > 1 else ""
         urgent.append(("업무", f"업무 {hot[0]['name']}: {hot[0]['phase']}{more}"))
     if sales:
-        line = f"매출 {'확인 필요' if sales['parts_flagged'] else sales['status']}: {_sales_line(sales)}"
-        if sales["parts_flagged"]:
-            line += f". 볼 구분 {', '.join(sales['parts_flagged'][:3])}"
-        # 전체가 평소여도 구분 하나가 기준을 넘으면 확인 필요로 올린다
-        if sales["status"] == "확인 필요" or sales["parts_flagged"]:
-            urgent.append(("매출", line))
+        line = f"매출 {sales['status']}: {_sales_line(sales)}"
+        if sales["status"] == "구분 확인":
+            # 첫 줄에서 문제 구분의 숫자가 바로 보이게 구분을 앞에, 전체를 뒤에 둔다
+            line = f"매출 구분 확인: {_parts_line(sales)}. 전체는 {_sales_line(sales)}"
+        elif sales["parts_flagged"]:
+            line += f". 볼 구분 {_parts_line(sales)}"
+        if sales["status"] != "평소":
+            urgent.insert(0, ("매출", line))  # 점장 보고의 첫 줄은 매출이다
         else:
             usual.append(line)
     if promos:
@@ -89,7 +98,10 @@ def template_summary(out):
         "sales", "promos", "review", "calendar", "pilot", "touch", "promo_results"))
     s = []
     if sales:
-        s.append(f"{_sales_line(sales)}로 {sales['status']}입니다.")
+        if sales["status"] == "구분 확인":
+            s.append(f"{_sales_line(sales)}로 전체는 기준 안이지만 {_parts_line(sales)}로 구분 확인이 필요합니다.")
+        else:
+            s.append(f"{_sales_line(sales)}로 {sales['status']}입니다.")
     if promos and promos["warn_count"]:
         s.append(f"행사 {len(promos['items'])}건 중 {promos['warn_count']}건에 경고가 있습니다.")
     if res and res["status"] == "확인 필요":

@@ -65,7 +65,10 @@ def test_sales_total_from_parts_and_alert(tmp_path):
                                  ["2026-11-05", "식품", 999, 100, 100]])  # 오늘은 마감 전이라 뺀다
     s = judge.rule_sales(rows, TODAY)
     assert s["total"]["sales"] == 185 and s["total"]["achieve_pct"] == 92.5 and s["total"]["yoy_pct"] == -7.5
-    assert s["status"] == "평소" and s["parts_flagged"] == ["식품"]
+    assert s["status"] == "구분 확인" and s["parts_flagged"] == ["식품"]
+    top = write.top_three({"sales": s})[0]
+    assert top.startswith("매출 구분 확인: 식품 전년 대비 -15.0%") and "전체는" in top
+    assert "구분 확인" in write.template_summary({"sales": s})
     rows = sales_rows(tmp_path, [["2026-11-04", "전체", 80, 100, 100], ["2026-11-04", "식품", 10, 10, 10]])
     s = judge.rule_sales(rows, TODAY)
     assert s["total"]["sales"] == 80 and s["status"] == "확인 필요" and len(s["reasons"]) >= 2
@@ -205,6 +208,8 @@ def test_webhook_payload(monkeypatch):
     monkeypatch.setenv("BRIEF_WEBHOOK_URL", "https://hooks.example.test/x")
     assert notify.send(b, opener) is True
     assert sent[0] == {"text": "[아침 점검 2026-11-05] 내 점포\n1. 가\n2. 나"}
+    monkeypatch.setattr(C, "OFFLINE", True)  # offline이면 주소가 있어도 보내지 않는다
+    assert notify.send(b, opener) is False and len(sent) == 1
 
 
 def test_init_templates(tmp_path):
