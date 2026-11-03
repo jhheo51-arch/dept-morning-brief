@@ -528,7 +528,10 @@ if(window.BRIEF&&!window.BRIEF.offline){var f=document.createElement('link');f.r
     var g=e.target.closest('[data-go]'); if(g){e.preventDefault(); go(g.getAttribute('data-go')); return;}
     var c=e.target.closest('[data-cp]'); if(c){e.preventDefault(); copyText(CP[+c.getAttribute('data-cp')],c);}
   });
-  var first='today'; try{first=localStorage.getItem('tab')||'today'}catch(e){}
+  // 주소 끝 #plan 처럼 탭 이름을 붙이면 그 탭으로 연다
+  var first='today', hs=location.hash.slice(1);
+  try{first=localStorage.getItem('tab')||'today'}catch(e){}
+  if(TABS.some(function(x){return x[0]===hs})) first=hs;
   show(first);
 
   // 아침 공유 글. 메신저에 붙여 넣기 좋은 짧은 글
