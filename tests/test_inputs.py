@@ -2,6 +2,7 @@
 import csv
 import datetime as dt
 import json
+import os
 import re
 
 import pytest
@@ -320,9 +321,18 @@ def test_consult_drafts_group_by_recipient(tmp_path):
     for i in b["promo_results"]["items"]:
         if i["flag"]:
             assert all(any(i["name"] in x["fact"] for x in drafts[k]["items"]) for k in ("VMD 담당", "채널 담당"))
-    # 접점 표시는 그 접점 담당에게
+    # 메모는 내가 직접 협의하는 VMD와 채널 담당에게만. 접점, 영업 구분, 다른 팀 업무는 팀장 보고로 넘긴다
+    assert set(drafts) == {"VMD 담당", "채널 담당"}
+    via = {x["to"] for x in b["consult"]["via_lead"]}
     for t in b["touch"]["flagged"]:
-        assert f"{t['place']} 담당" in drafts
+        assert f"{t['place']} 담당" in via
+    for p in b["sales"]["parts"]:
+        if p["flags"]:
+            assert f"{p['part']} 영업 담당" in via
+    L = b["lead"]
+    shown = {a for a, _ in L["asks"]} | {a.removesuffix(" 담당") + " 담당" for a, _ in L["actions"]}
+    assert len(L["asks"]) <= 4 and (L["more_asks"] or via <= shown)
+    assert not L["asks"] or "다른 팀 확인 요청" in L["text"]
     # 초안 속 % 숫자는 모두 판단 결과에 있는 숫자
     judged = json.dumps({k: b[k] for k in ("sales", "promo_results", "touch")}, ensure_ascii=False)
     for d in drafts.values():
@@ -521,7 +531,7 @@ def test_tasks_link_to_promo_warnings(tmp_path):
     assert i["warns"] == ["알릴 길 미정"] and "완료로 처리함" in i["handled"][0]
     assert i["tasks"] == ["업무 '사은 행사 알릴 길 정하기' D-1, 채널팀"]
     c = judge.consult_drafts(TODAY, {"tasks": t})
-    assert [d["to"] for d in c["drafts"]] == ["채널팀 담당"]
+    assert c["drafts"] == [] and [x["to"] for x in c["via_lead"]] == ["채널팀 담당"]
     w = judge.week_summary(TODAY, {"tasks": t}, None, judge.merge_task_archive([], t, TODAY))
     assert w["sections"][0]["title"] == "업무" and "끝낸 업무 1건" in w["sections"][0]["lines"][0]
 
@@ -560,6 +570,33 @@ def test_partial_sales_file_stops_part_warnings(tmp_path):
     assert "집계가 덜 된 파일" in s["reasons"][0] and s["parts_flagged"] == []
     w = judge.next_week_checks(TODAY, {"sales": s}, TODAY - dt.timedelta(days=7), TODAY - dt.timedelta(days=1))
     assert w[0].startswith("매출 파일 다시 받기: 11/04")
+
+
+def test_partial_by_ratio_and_by_file_time(tmp_path):
+    rows = []
+    for w in range(4, 0, -1):
+        d = (TODAY - dt.timedelta(days=1 + 7 * w)).isoformat()
+        rows += [[d, "전체", "1000", "1000", "1000"], [d, "식품", "400", "400", "400"]]
+    d = (TODAY - dt.timedelta(days=1)).isoformat()
+    rows += [[d, "전체", "700", "1000", "1000"], [d, "식품", "200", "400", "400"]]
+    # 시각 설정이 없으면 같은 요일 평균의 70%는 80% 기준에 걸린다
+    s = judge.rule_sales(sales_rows(tmp_path, rows), TODAY)
+    assert s["partial"] and s["partial_pct"] == 70.0 and "confirm_hour" in s["reasons"][0]
+    real_mode(tmp_path, "[sales]\nconfirm_hour = 6\n")
+    got = sales_rows(tmp_path, rows)
+    f = tmp_path / "sales.csv"
+    # 확정 시각(11/05 06:00) 전에 받은 파일은 숫자와 상관없이 덜 된 집계
+    early = dt.datetime(2026, 11, 5, 5, 40).timestamp()
+    os.utime(f, (early, early))
+    s = judge.rule_sales(got, TODAY)
+    assert s["partial"] and "11/5 05:40에 받아" in s["partial_why"] and s["parts_flagged"] == []
+    L = judge.lead_report(TODAY, {"sales": s})
+    assert "(파일을 11/5 05:40에 받아 확정 시각(11/5 06:00) 전) 새 파일을 받은 뒤 보고" in L["headline"]
+    # 확정 뒤에 받은 파일은 70%여도 실제 숫자로 보고 구분 경고를 낸다
+    late = dt.datetime(2026, 11, 5, 6, 30).timestamp()
+    os.utime(f, (late, late))
+    s = judge.rule_sales(got, TODAY)
+    assert not s["partial"] and s["partial_pct"] is None and s["parts_flagged"] == ["식품"]
 
 
 def test_archive_merges_when_only_due_changed(tmp_path):

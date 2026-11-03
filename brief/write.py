@@ -225,6 +225,9 @@ def consult_markdown(b):
         lines += ["오늘은 협의할 확인 필요 항목이 없습니다.", ""]
     for d in c["drafts"]:
         lines += [f"## {d['to']}", "", d["text"], ""]
+    if c.get("via_lead"):
+        lines += ["## 팀장 보고로 넘긴 것", "", "다른 팀에 물을 것은 메모를 따로 보내지 않고 팀장 보고 한 장(lead.md)에 실었습니다.", ""]
+        lines += [f"- {x['to']}: {', '.join(i['fact'] for i in x['items'])}" for x in c["via_lead"]] + [""]
     lines += [f"묶는 규칙: {c['rule_text']}.", "보내기 전에 문장을 다듬고, 숫자는 원본 파일과 한 번 더 맞춰 봅니다.", ""]
     return "\n".join(lines)
 

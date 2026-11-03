@@ -101,15 +101,31 @@ def rule_sales(rows, today):
             f.append(f"목표 달성 {m['achieve_pct']}%(기준 {tgt_thr}% 미만)")
         return f
     reasons = flags(t)
-    # 어제 매출이 최근 같은 요일 평균의 일부뿐이면 중간 집계 파일일 수 있다. 이때는 구분별 경고를 내지 않고 파일부터 묻는다
-    partial_pct = C.SALES.get("partial_pct", 50)
+    # 중간 집계 파일 가리기. 이때는 구분별 경고를 내지 않고 파일부터 묻는다
+    # 1) [sales] confirm_hour(어제 매출이 오늘 몇 시에 확정되는지)를 적었으면 파일 받은 시각으로 가린다. 확정 뒤 파일이면 낮아도 실제 숫자로 본다
+    # 2) 적지 않았거나 시각을 모르면 어제가 최근 같은 요일 평균의 partial_pct % 미만인지로 가린다(가정값)
+    partial_pct = C.SALES.get("partial_pct", 80)
     same = [totals[d]["sales"] for d in days if d < day and (day - d).days % 7 == 0 and (day - d).days <= 28
             and totals[d]["sales"]]
-    partial = None
-    if same and t["sales"] is not None and t["sales"] < sum(same) / len(same) * partial_pct / 100:
-        partial = round(t["sales"] / (sum(same) / len(same)) * 100, 1)
-        reasons = [f"{day.month}/{day.day} 매출이 최근 같은 요일 평균의 {partial}%라 집계가 덜 된 파일일 수 있습니다. "
-                   "새 파일을 받아 다시 돌려 주세요"]
+    ratio = (round(t["sales"] / (sum(same) / len(same)) * 100, 1)
+             if same and t["sales"] is not None else None)
+    hour, got = C.SALES.get("confirm_hour"), None
+    path = I.READ.get("sales")
+    if hour is not None and not C.SAMPLE and path is not None:
+        got = dt.datetime.fromtimestamp(path.stat().st_mtime)
+    partial, partial_why = False, ""
+    if got is not None:
+        due = dt.datetime.combine(day + dt.timedelta(days=1), dt.time(int(hour)))
+        if got < due:
+            partial = True
+            partial_why = (f"파일을 {got.month}/{got.day} {got:%H:%M}에 받아 확정 시각"
+                           f"({due.month}/{due.day} {due:%H:%M}) 전입니다")
+    elif ratio is not None and ratio < partial_pct:
+        partial = True
+        partial_why = f"매출이 최근 같은 요일 평균의 {ratio}%입니다"
+    if partial:
+        reasons = [f"{day.month}/{day.day} {partial_why}. 집계가 덜 된 파일일 수 있어 새 파일을 받아 다시 돌려 주세요"
+                   + ("" if got is not None else ". 새 파일도 같으면 실제 하락이며, [sales] confirm_hour를 적으면 받은 시각으로 가립니다")]
     parts = []
     for name, x in sorted(by_day[day].items(), key=lambda kv: -(kv[1]["sales"] or 0)):
         if name == total_name:
@@ -127,7 +143,7 @@ def rule_sales(rows, today):
         "rule": "매출 현황",
         "date": day.isoformat(),
         "stale_days": (today - day).days,
-        "partial_pct": partial,
+        "partial": partial, "partial_pct": ratio if partial else None, "partial_why": partial_why,
         "total": t, "mtd": mtd, "last7": last7,
         "parts": parts,
         "parts_flagged": [p["part"] for p in parts if p["flags"]],
@@ -139,7 +155,9 @@ def rule_sales(rows, today):
         "yoy_alert_pct": yoy_thr, "target_alert_pct": tgt_thr,
         "rule_text": f"어제 또는 최근 7일 전년 대비 {yoy_thr}% 이하, 어제 목표 달성 {tgt_thr}% 미만이면 확인 필요. "
                      f"전체는 괜찮고 구분 하나라도 같은 기준을 넘으면 구분 확인. "
-                     f"어제가 최근 같은 요일 평균의 {partial_pct}% 미만이면 덜 된 집계로 보고 구분 경고를 멈춤",
+                     + (f"매출 파일을 확정 시각(다음 날 {int(hour)}시) 전에 받았으면" if hour is not None and not C.SAMPLE
+                        else f"어제가 최근 같은 요일 평균의 {partial_pct}% 미만이면")
+                     + " 덜 된 집계로 보고 구분 경고를 멈춤",
         "unit_note": I.unit_note(rows),
         "source": _src(rows[0]["_file"]) + (f". {I.unit_note(rows)}" if I.unit_note(rows) else ""),
     }
@@ -809,8 +827,8 @@ def next_week_checks(today, out, start, end):
     until = today + dt.timedelta(days=6)
     lines = []
     sales = out.get("sales")
-    if sales and sales.get("partial_pct") is not None:
-        lines.append(f"매출 파일 다시 받기: {_md(sales['date'])} 매출이 같은 요일 평균의 {sales['partial_pct']}%")
+    if sales and sales.get("partial"):
+        lines.append(f"매출 파일 다시 받기: {_md(sales['date'])} {sales['partial_why']}")
     tasks = out.get("tasks")
     if tasks and not tasks.get("stale"):
         lines += [f"{_md(t['due'])} 기한: {t['name']}" + (f" ({t['owner']} 담당)" if t["owner"] else "")
@@ -838,7 +856,9 @@ def next_week_checks(today, out, start, end):
 
 # 협의 초안
 def consult_drafts(today, out):
-    """오늘 확인 필요 항목을 받는 사람별 메모로 묶는다. 사실은 판단 결과의 숫자만, 요청은 정해진 문장만 쓴다."""
+    """오늘 확인 필요 항목을 받는 사람별 메모로 묶는다. 사실은 판단 결과의 숫자만, 요청은 정해진 문장만 쓴다.
+    메모는 내가 직접 협의하는 사람([consult] direct, 기본 VMD와 채널 담당)에게만 쓰고, 영업 구분, 접점, 다른 팀 업무,
+    앱 운영처럼 팀장 라인을 거칠 질문은 via_lead 로 넘겨 팀장 보고 한 장에 싣는다."""
     who = C.CONSULT
     vmd, channel, app = who.get("vmd", "VMD 담당"), who.get("channel", "채널 담당"), who.get("app", "앱 운영 담당")
     v = "(가상)" if C.SAMPLE else ""
@@ -893,18 +913,23 @@ def consult_drafts(today, out):
     if review and review["status"] == "확인 필요":
         add(app, f"새 1~2점 리뷰 {review['low_new']}건, 앱이 막혔다는 리뷰 {review['blocked_new']}건",
             "같은 시간대에 장애나 배포가 있었는지 알려 주세요.")
+    direct = who.get("direct", [vmd, channel])
+    via_lead = [{"to": to, "items": [{k: v for k, v in x.items() if k != "key"} for x in items]}
+                for to, items in memo.items() if to not in direct]
     drafts = []
     for to, items in memo.items():
+        if to not in direct:
+            continue
         text = [f"{to}님, 오늘({today.isoformat()}) 아침 점검에서 같이 볼 것이 있어 공유드립니다.", ""]
         text += [f"{n}. {x['fact']}. {x['ask']}" for n, x in enumerate(items, 1)]
         text += ["", "숫자는 아침 점검 결과에서 옮겼습니다." + (" 가상 데이터로 만든 시연입니다." if C.SAMPLE else "")]
         items = [{k: v for k, v in x.items() if k != "key"} for x in items]
         drafts.append({"to": to, "count": len(items), "items": items, "text": "\n".join(text)})
     drafts.sort(key=lambda d: -d["count"])
-    return {"rule": "협의 초안", "drafts": drafts,
-            "rule_text": "VMD 경고는 VMD 담당, 알릴 길과 마감 안내는 채널 담당, 성과가 낮은 행사는 둘 다(같은 행사는 한 줄로), "
-                         "구분 매출 경고는 그 구분 영업 담당, 접점 숫자 표시는 그 접점 담당, 리뷰 확인 필요는 앱 운영 담당, "
-                         "남이 맡은 업무 중 기한이 지났거나 며칠 안 남은 것은 그 담당",
+    return {"rule": "협의 초안", "drafts": drafts, "via_lead": via_lead,
+            "rule_text": "VMD 경고는 VMD 담당, 알릴 길과 마감 안내는 채널 담당, 성과가 낮은 행사는 둘 다(같은 행사는 한 줄로) 메모로 씀. "
+                         "구분 매출 경고(그 구분 영업 담당), 접점 숫자 표시(그 접점 담당), 리뷰 확인 필요(앱 운영 담당), "
+                         "남이 맡은 업무 중 기한이 지났거나 며칠 안 남은 것(그 담당)은 메모 대신 팀장 보고의 '다른 팀 확인 요청'에 실음",
             "source": "오늘 판단 결과. 요청 문장은 정해진 목록이며 보내기 전에 담당자가 다듬습니다"}
 
 
@@ -933,8 +958,8 @@ def lead_report(today, out):
                    ["월 누계", s["mtd"]["sales_text"], f"목표 {s['mtd']['achieve_pct']}%"],
                    ["최근 7일", f"전년 대비 {_sign(s['last7']['yoy_pct'])}", f"목표 {s['last7']['achieve_pct']}%"]]
         flagged = sorted([p for p in s["parts"] if p["flags"]], key=lambda p: p["yoy_pct"] if p["yoy_pct"] is not None else 0)
-        if s["partial_pct"] is not None:
-            head = f"{d} 매출 파일이 덜 된 집계로 보여(같은 요일 평균의 {s['partial_pct']}%) 새 파일을 받은 뒤 보고합니다."
+        if s.get("partial"):
+            head = f"{d} 매출 파일이 덜 된 집계로 보여({s['partial_why'].removesuffix('입니다')}) 새 파일을 받은 뒤 보고합니다."
         elif s["status"] == "확인 필요":
             head = f"{d} 전체 매출{v}이 {', '.join(r.split('(')[0] for r in s['reasons'])}로 기준을 넘었습니다."
             focus = flagged[0] if flagged else None
@@ -984,6 +1009,15 @@ def lead_report(today, out):
     more = max(0, len(acts) - 4)
     acts = acts[:4]
 
+    # 다른 팀에 물을 것은 내가 따로 메모를 보내지 않고 팀장 라인으로 올린다. 오늘 조치에 이미 있는 담당은 뺀다
+    def who_of(x):
+        return x.removesuffix(" 담당")
+    seen = {who_of(a) for a, _ in acts}
+    asks = [[x["to"], ", ".join(i["fact"] for i in x["items"])] for x in consult_drafts(today, out)["via_lead"]
+            if who_of(x["to"]) not in seen]
+    more_asks = max(0, len(asks) - 4)
+    asks = asks[:4]
+
     decide = []
     p = out.get("pilot")
     if p and p.get("check_day"):
@@ -1008,14 +1042,19 @@ def lead_report(today, out):
         lines.append("따로 챙길 일이 없습니다.")
     if more:
         lines.append(f"외 {more}건은 아침 점검 화면에 있습니다.")
+    if asks:
+        lines += ["", "다른 팀 확인 요청(팀장님 라인으로 부탁드립니다)"] + [f"- {a}: {b}" for a, b in asks]
+        if more_asks:
+            lines.append(f"외 {more_asks}곳은 아침 점검 화면에 있습니다.")
     lines += ["", "정해 주실 것"] + [f"- {x}" for x in decide]
     if C.SAMPLE:
         lines += ["", "가상 데이터로 만든 시연입니다."]
     return {"rule": "팀장 보고 한 장", "headline": head, "numbers": numbers, "causes": causes, "actions": acts,
-            "more": more, "decide": decide, "text": "\n".join(lines),
+            "more": more, "asks": asks, "more_asks": more_asks, "decide": decide, "text": "\n".join(lines),
             "rule_text": "결론은 매출 세 단계(평소, 구분 확인, 확인 필요)와 덜 된 집계 여부로 고른다. 원인 후보는 같은 구분의 "
                          "최근 7일과 7일 안에 끝났거나 진행 중인 같은 구분 행사만 적고 원인으로 단정하지 않는다. 조치는 구분 영업 담당, "
-                         "기한이 지났거나 오늘인 업무, 업무로 안 잡힌 행사 경고, 접점 숫자, 리뷰 순으로 4개까지",
+                         "기한이 지났거나 오늘인 업무, 업무로 안 잡힌 행사 경고, 접점 숫자, 리뷰 순으로 4개까지. 다른 팀 확인 요청은 "
+                         "협의 초안에서 메모로 쓰지 않은 항목 중 오늘 조치에 없는 담당, 4곳까지",
             "source": "오늘 판단 결과(매출, 행사 성과, 업무, 행사, 접점 숫자, 리뷰, 시범)"}
 
 
