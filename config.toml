@@ -6,7 +6,7 @@
 # sample: 가상 매출, 가상 행사, 가상 시범으로 화면을 만들고 docs/ 와 data/ 에 씁니다(공개 시연).
 # real: inputs/ 폴더의 내 파일을 읽고 output/ 폴더에만 씁니다.
 mode = "sample"
-store_name = "더현대 서울(시연)"
+store_name = "여의도 플래그십(가상)"
 # Claude 요약(allow_llm). 적지 않으면 sample 모드는 켜짐, real 모드는 꺼짐입니다.
 # real 모드에서 켜면 매출 같은 내부 숫자가 외부 API로 나가므로 config.local.toml 에서만 켭니다.
 # offline = true 이면 인터넷에 전혀 나가지 않습니다(리뷰와 날씨 수집을 건너뛰고 요일과 공휴일로만 달력을 만듦).

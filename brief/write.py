@@ -172,6 +172,8 @@ def brief_markdown(b):
     lines = [f"# 아침 점검 {b['date']}", "", "## 오늘 볼 것"]
     lines += [f"{i}. {t}" for i, t in enumerate(b["top3"], 1)]
     lines += ["", "## 요약", b["summary"], ""]
+    if b.get("lead"):
+        lines += ["팀장 보고 한 장은 lead.md 에 있습니다.", ""]
     if (b.get("sales") or {}).get("unit_note"):
         lines += [f"매출 단위: {b['sales']['unit_note']}", ""]
     t = b.get("tasks")
@@ -190,6 +192,12 @@ def brief_markdown(b):
     lines += ["공개 데이터와 가상 데이터만 씁니다. 현대백화점 내부 자료가 아닙니다." if b.get("mode", "sample") == "sample"
               else "내 업무 파일로 만든 점검입니다. 외부에 공유하지 마세요.", ""]
     return "\n".join(lines)
+
+
+def lead_markdown(b):
+    L = b["lead"]
+    return "\n".join([f"# 팀장 보고 한 장 {b['date']}", "", "```", L["text"], "```", "",
+                      f"고르는 규칙: {L['rule_text']}.", "보내기 전에 숫자와 담당을 한 번 더 확인합니다.", ""])
 
 
 def weekly_markdown(b):
@@ -223,7 +231,8 @@ def plan_markdown(b):
         lines += [f"## {c['pilot']}번 {c['name']} | {c['when']}", "",
                   f"- 왜 이날: {c['situation']}. {c['basis']}",
                   f"- 누구에게: {c['target']}",
-                  f"- 무엇을: {c['benefit']}",
+                  f"- 무엇을: {c['benefit']}" + (f" (행사 파일: {', '.join(c['benefit_from'])})" if c.get("benefit_from")
+                                                 else " [혜택 확정 후, 행사 파일에 없음]"),
                   f"- 알릴 길: {', '.join(c['channels'])}",
                   f"- 문구 A: {c['copy_a']}",
                   f"- 문구 B: {c['copy_b']}",

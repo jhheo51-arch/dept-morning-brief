@@ -115,7 +115,10 @@ def rule_sales(rows, today):
         if name == total_name:
             continue
         m = metrics(x)
-        parts.append({"part": name, **m, "flags": [] if partial else flags(m)})
+        # 구분 최근 7일. 하루치 하락인지 이어지는 하락인지 가르는 데 쓴다. 7일이 다 있을 때만 센다
+        w = [by_day[d][name] for d in days if day - dt.timedelta(days=6) <= d <= day and name in by_day[d]]
+        parts.append({"part": name, **m, "flags": [] if partial else flags(m),
+                      "last7_yoy_pct": metrics(sum_of(w))["yoy_pct"] if len(w) == 7 else None})
     if not partial and last7["yoy_pct"] is not None and last7["yoy_pct"] <= yoy_thr:
         reasons.append(f"최근 7일 전년 대비 {last7['yoy_pct']}%")
     series = [{"date": d.isoformat(), "sales": totals[d]["sales"], "prev": totals[d]["prev"],
@@ -857,6 +860,110 @@ def consult_drafts(today, out):
             "source": "오늘 판단 결과. 요청 문장은 정해진 목록이며 보내기 전에 담당자가 다듬습니다"}
 
 
+def _sign(n):
+    return "-" if n is None else f"{n:+}%"
+
+
+def lead_report(today, out):
+    """팀장에게 올릴 한 장. 결론 한 줄, 숫자 세 개, 원인 후보(확인 전), 오늘 조치와 담당, 정해 주실 것.
+    문장은 판단 결과의 숫자로만 채우고, 원인은 후보로만 적는다."""
+    v = "(가상)" if C.SAMPLE else ""
+
+    def md(x):
+        return x[5:].replace("-", "/")
+    s = out.get("sales")
+    thr = C.SALES.get("yoy_alert_pct", -10)
+    head, numbers, causes, focus = "", [], [], None
+    if not s:
+        head = "매출 파일이 없어 오늘은 행사와 업무만 보고합니다."
+    else:
+        t, d = s["total"], md(s["date"])
+        tl = f"목표 {t['achieve_pct']}%, 전년 대비 {_sign(t['yoy_pct'])}"
+        numbers = [["어제 매출", t["sales_text"], tl],
+                   ["월 누계", s["mtd"]["sales_text"], f"목표 {s['mtd']['achieve_pct']}%"],
+                   ["최근 7일", f"전년 대비 {_sign(s['last7']['yoy_pct'])}", f"목표 {s['last7']['achieve_pct']}%"]]
+        flagged = sorted([p for p in s["parts"] if p["flags"]], key=lambda p: p["yoy_pct"] if p["yoy_pct"] is not None else 0)
+        if s["partial_pct"] is not None:
+            head = f"{d} 매출 파일이 덜 된 집계로 보여(같은 요일 평균의 {s['partial_pct']}%) 새 파일을 받은 뒤 보고합니다."
+        elif s["status"] == "확인 필요":
+            head = f"{d} 전체 매출{v}이 {', '.join(r.split('(')[0] for r in s['reasons'])}로 기준을 넘었습니다."
+            focus = flagged[0] if flagged else None
+            if focus:
+                head += f" 구분별로는 {focus['part']}({_sign(focus['yoy_pct'])})가 가장 낮습니다."
+        elif s["status"] == "구분 확인":
+            focus = flagged[0]
+            head = (f"{d} 전체 매출{v}은 {tl}로 기준 안이지만 {focus['part']} 매출이 전년 대비 "
+                    f"{_sign(focus['yoy_pct'])}, 목표 {focus['achieve_pct']}%로 낮습니다.")
+            if len(flagged) > 1:
+                head += f" {', '.join(p['part'] for p in flagged[1:])}도 기준을 넘었습니다."
+        else:
+            head = f"{d} 전체 매출{v}은 {tl}로 기준 안입니다."
+        if focus:
+            w = focus.get("last7_yoy_pct")
+            if w is not None:
+                causes.append(f"{focus['part']} 최근 7일 전년 대비 {_sign(w)}: "
+                              + ("7일 전체도 낮아 이어지는 하락일 수 있습니다" if w <= thr
+                                 else "7일로 보면 기준 안이라 하루치 하락인지 먼저 봅니다"))
+            for i in (out.get("promo_results") or {}).get("items", []):
+                if i["part"] != focus["part"] or (i["ended"] and (dt.date.fromisoformat(s["date"])
+                                                                  - dt.date.fromisoformat(i["end"])).days > 7):
+                    continue
+                causes.append(f"같은 구분 행사 {i['name']}: {md(i['start'])}~{md(i['to'])} {i['sales_text']}{v}, "
+                              f"앞 같은 요일 기간 대비 {i['growth']:+}%" + (f", {md(i['end'])} 끝남" if i["ended"] else ", 진행 중"))
+            causes.append(f"전년 같은 날의 행사와 날씨는 이 도구에 없어 {focus['part']} 영업 담당에게 확인합니다")
+
+    acts = []
+    if focus:
+        acts.append([f"{focus['part']} 영업 담당", f"{md(s['date'])} 품절, 행사 종료, 날씨 등 달랐던 점 확인"])
+    tasks = out.get("tasks")
+    done_promo = set()
+    for i in (tasks or {}).get("items", []) if tasks and not tasks.get("stale") else []:
+        if i["left"] is not None and i["left"] <= 0:
+            acts.append([i["owner"] or "담당 미정", f"{i['name']}({i['phase']})"])
+            done_promo.add(i.get("promo"))
+    for i in (out.get("promos") or {}).get("items", []):
+        if i["warns"] and i["name"] not in done_promo:
+            acts.append([i["owner"] or "담당 미정", f"{i['name']}: {i['warns'][0]}"])
+    for t in (out.get("touch") or {}).get("flagged", []):
+        acts.append([f"{t['place']} 담당", f"{t['metric']}{v} 평소 대비 {t['change_pct']:+}%, 기록 누락인지 확인"])
+    r = out.get("review")
+    if r and r["status"] == "확인 필요":
+        acts.append([C.CONSULT.get("app", "앱 운영 담당"), f"새 1~2점 {r['low_new']}건, 막힘 {r['blocked_new']}건, 장애나 배포 확인"])
+    more = max(0, len(acts) - 4)
+    acts = acts[:4]
+
+    decide = []
+    p = out.get("pilot")
+    if p and p.get("check_day"):
+        decide.append(f"시범 {p['week_label']} 점검일입니다. 현재 판단은 {p['decision']}이라 계속할지 정해 주세요")
+    for i in (out.get("promo_results") or {}).get("items", []):
+        if i["flag"] and not i["ended"]:
+            decide.append(f"{i['name']}이 앞 같은 요일 기간 대비 {i['growth']:+}%라 진열이나 알림을 바꿀지 정해 주세요")
+    if not decide:
+        decide = ["오늘 정해 주실 것은 없습니다"]
+
+    day = f"{today.month}/{today.day:02d}({'월화수목금토일'[today.weekday()]})"
+    lines = [f"[{day} 아침 보고] {C.STORE_NAME}".rstrip(), "", f"결론: {head}"]
+    if numbers:
+        lines.append(f"숫자{v}: " + ", ".join(f"{a} {b}({c})" for a, b, c in numbers))
+    if causes:
+        lines += ["", "원인 후보(확인 전)"] + [f"- {c}" for c in causes]
+    lines += ["", "오늘 조치"] + [f"{n}. {a}: {b}" for n, (a, b) in enumerate(acts, 1)]
+    if not acts:
+        lines.append("따로 챙길 일이 없습니다.")
+    if more:
+        lines.append(f"외 {more}건은 아침 점검 화면에 있습니다.")
+    lines += ["", "정해 주실 것"] + [f"- {x}" for x in decide]
+    if C.SAMPLE:
+        lines += ["", "가상 데이터로 만든 시연입니다."]
+    return {"rule": "팀장 보고 한 장", "headline": head, "numbers": numbers, "causes": causes, "actions": acts,
+            "more": more, "decide": decide, "text": "\n".join(lines),
+            "rule_text": "결론은 매출 세 단계(평소, 구분 확인, 확인 필요)와 덜 된 집계 여부로 고른다. 원인 후보는 같은 구분의 "
+                         "최근 7일과 7일 안에 끝났거나 진행 중인 같은 구분 행사만 적고 원인으로 단정하지 않는다. 조치는 구분 영업 담당, "
+                         "기한이 지났거나 오늘인 업무, 업무로 안 잡힌 행사 경고, 접점 숫자, 리뷰 순으로 4개까지",
+            "source": "오늘 판단 결과(매출, 행사 성과, 업무, 행사, 접점 숫자, 리뷰, 시범)"}
+
+
 def plan_drafts(today, out):
     """이번 주 달력에서 시범별로 가장 가까운 날을 골라 집객 기획 초안을 만든다. 문장은 설정의 재료만 쓴다."""
     cal = out.get("calendar") or {}
@@ -885,18 +992,23 @@ def plan_drafts(today, out):
                             else "대상을 넓힐 범위를 함께 정합니다."))
         if low and n != "3" and not cut:
             notes.append(f"성과가 낮았던 행사: {', '.join(i['name'] for i in low)}. 같은 혜택을 되풀이하지 않습니다.")
+        # 혜택은 설정 문장이라 확정된 것이 아니다. 그날 걸친 행사 중 이름 첫 낱말(식품관, 문화센터 등)이 혜택 문장에 있으면
+        # 행사 파일에 잡힌 혜택으로 보고, 없으면 문구 앞에 [혜택 확정 후]를 붙여 확정 전에 나가지 않게 한다
+        hit = [i["name"] for i in (out.get("promos") or {}).get("items", [])
+               if i["start"] <= row["date"] <= i["end"] and i["name"].split()[0] in row["benefit"]]
+        hold = "" if hit else "[혜택 확정 후] "
         cards.append({
-            "pilot": int(n), "name": names.get(n, ""),
+            "pilot": int(n), "name": names.get(n, ""), "benefit_from": hit, "hold": bool(hold),
             "date": row["date"], "when": f"{d.month}/{d.day}({DOW[d.weekday()]}) " + ", ".join(row["times"]),
             "situation": ", ".join(row["situation"]), "basis": row["basis"],
             "target": p.get("target", ""), "benefit": row["benefit"], "channels": row["channels"],
-            "copy_a": fill_event(p["copy_a_rain"], end, p.get("copy_a_rain_none", "")) if row["rain"] and p.get("copy_a_rain")
-            else fill_event(p.get("copy_a", ""), end, p.get("copy_a_none", "")),
-            "copy_b": fill_event(p.get("copy_b", ""), end, p.get("copy_b_none", "")),
+            "copy_a": hold + (fill_event(p["copy_a_rain"], end, p.get("copy_a_rain_none", "")) if row["rain"] and p.get("copy_a_rain")
+                              else fill_event(p.get("copy_a", ""), end, p.get("copy_a_none", ""))),
+            "copy_b": hold + fill_event(p.get("copy_b", ""), end, p.get("copy_b_none", "")),
             "measure": p.get("measure", ""), "owner": p.get("owner", ""), "notes": notes})
     cards.sort(key=lambda c: (c["date"], c["pilot"]))
     return {"rule": "집객 기획 초안", "cards": cards[:C.PLAN.get("max_cards", 3)],
             "rule_text": "이번 주 달력에서 시범마다 가장 가까운 날 하나. 대상, 문구, 재는 법은 설정 문장, "
                          "때와 혜택, 알릴 길은 달력 판단, '마지막 날' 문구는 행사 파일에서 그날 끝나는 행사가 있을 때만, "
-                         "참고는 시범 신호와 성과가 낮은 행사",
+                         "참고는 시범 신호와 성과가 낮은 행사. 혜택이 그날 걸친 행사 파일 항목과 맞지 않으면 문구 앞에 [혜택 확정 후]",
             "source": "이번 주 집객 달력, 시범 점검, 행사 성과. 무엇을 할지는 담당자가 정합니다"}

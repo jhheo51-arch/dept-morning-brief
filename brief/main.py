@@ -16,7 +16,7 @@ ROOT = C.ROOT
 BLOCKS = {"review": "리뷰 수집", "calendar": "날씨 예보 수집", "pilot": "시범 계산", "field": "현장 목록 판단",
           "sales": "매출 파일 읽기", "promos": "행사 파일 읽기", "promo_results": "행사 성과 계산",
           "touch": "접점 숫자 파일 읽기", "tasks": "업무 목록 읽기", "weekly": "주간 정리",
-         "consult": "협의 초안", "plan": "기획 초안"}
+         "consult": "협의 초안", "plan": "기획 초안", "lead": "팀장 보고"}
 FILES = {"sales": "sales", "promos": "promotions", "pilot": "pilot_weekly", "field": "field_log",
          "touch": "touchpoint_daily", "tasks": "tasks"}
 
@@ -192,6 +192,10 @@ def run(now=None, root=ROOT, review_fetch=None, weather_fetch=None, summarizer=N
     except Exception as e:  # noqa: BLE001
         brief["consult"] = fallback("consult", e)
     try:
+        brief["lead"] = judge.lead_report(today, out)
+    except Exception as e:  # noqa: BLE001
+        brief["lead"] = fallback("lead", e)
+    try:
         brief["plan"] = judge.plan_drafts(today, out)
     except Exception as e:  # noqa: BLE001
         brief["plan"] = fallback("plan", e)
@@ -229,6 +233,8 @@ def run(now=None, root=ROOT, review_fetch=None, weather_fetch=None, summarizer=N
     (docs / "brief.md").write_text(write.brief_markdown(brief), encoding="utf-8")
     if brief["weekly"]:
         (docs / "weekly.md").write_text(write.weekly_markdown(brief), encoding="utf-8")
+    if brief["lead"]:
+        (docs / "lead.md").write_text(write.lead_markdown(brief), encoding="utf-8")
     if brief["consult"]:
         (docs / "consult.md").write_text(write.consult_markdown(brief), encoding="utf-8")
     if brief["plan"]:

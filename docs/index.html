@@ -101,10 +101,19 @@ details.archive summary{cursor:pointer; font-weight:700; font-size:14px}
 .headline ol a:hover{color:var(--green-d)}
 .acts{display:flex; gap:8px; flex-wrap:wrap; margin-top:12px}
 .btn{font:inherit; font-size:13px; font-weight:600; border:1px solid var(--green-d); color:var(--green-d); background:var(--card); border-radius:6px; padding:5px 12px; cursor:pointer; text-decoration:none}
+#lead .lead-h{font-size:16px; font-weight:700; line-height:1.55; margin:10px 0 8px}
+.lead-n{display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); gap:8px; margin:8px 0}
+.lead-n>div{background:var(--bg); border:1px solid var(--line); border-radius:8px; padding:8px 10px}
+.lead-n .l{font-size:12px; color:var(--muted)} .lead-n .x{font-size:15px; font-weight:700}
+.lead-s{margin-top:10px; font-size:14.5px} .lead-s ul,.lead-s ol{margin:4px 0 0; padding-left:20px} .lead-s li{margin:3px 0}
+.lead-s .k{font-weight:700}
 .todo{list-style:none; margin:8px 0 0; padding:0}
 .todo li{display:flex; gap:10px; align-items:flex-start; padding:9px 2px; border-bottom:1px solid var(--line); font-size:14.5px}
 .todo input{width:18px; height:18px; margin-top:2px; accent-color:var(--green-d); flex:0 0 auto}
 .todo label{flex:1 1 auto; cursor:pointer}
+.jg{display:flex; gap:4px; flex:0 0 auto} .jg button{font:inherit; font-size:12px; cursor:pointer; background:var(--bg); border:1px solid var(--line); border-radius:6px; padding:2px 7px; color:var(--muted)}
+.jg button.on{background:var(--green-d); border-color:var(--green-d); color:#fff}
+@media print{.jg,#jcsv{display:none}}
 .todo .k{flex:0 0 auto; font-size:11.5px; font-weight:700; color:var(--muted); background:var(--bg); border-radius:4px; padding:1px 6px; margin-top:2px}
 .todo li.done span.t{color:var(--muted); text-decoration:line-through}
 .todo a{flex:0 0 auto; color:var(--green-d)}
@@ -149,6 +158,7 @@ footer{font-size:13px; color:var(--muted); text-align:center; margin-top:24px}
       <div class="chips" id="chips"></div>
       <div class="acts"><button type="button" class="btn" id="sharecopy">아침 공유 글 복사</button><a class="btn" href="brief.md">brief.md 받기</a><button type="button" class="btn" id="printbtn">인쇄</button></div>
     </section>
+    <section class="card" id="lead"></section>
     <section class="card" id="todo"></section>
     <section class="card" id="c44"></section>
   </div>
@@ -413,7 +423,7 @@ if(window.BRIEF&&!window.BRIEF.offline){var f=document.createElement('link');f.r
         return '<div class="plan"><div class="pt">'+c.pilot+'번 '+esc(c.name)+'</div><div class="pw">'+esc(c.when)+'</div><dl>'
           +'<dt>왜 이날</dt><dd>'+esc(c.situation)+'. '+esc(c.basis)+'</dd>'
           +'<dt>누구에게</dt><dd>'+esc(c.target)+'</dd>'
-          +'<dt>무엇을</dt><dd>'+esc(c.benefit)+'</dd>'
+          +'<dt>무엇을</dt><dd>'+esc(c.benefit)+((c.benefit_from||[]).length?'<br><span class="sub">행사 파일: '+esc(c.benefit_from.join(', '))+'</span>':c.hold?'<br><span class="tag warn">혜택 확정 후, 행사 파일에 없음</span>':'')+'</dd>'
           +'<dt>알릴 길</dt><dd>'+esc(c.channels.join(', '))+'</dd>'
           +'<dt>문구 A</dt><dd>'+esc(c.copy_a)+cbtn(c.copy_a)+'</dd><dt>문구 B</dt><dd>'+esc(c.copy_b)+cbtn(c.copy_b)+'</dd>'
           +'<dt>재는 법</dt><dd>'+esc(c.measure)+'</dd><dt>맡을 곳</dt><dd>'+esc(c.owner)+'</dd></dl>'
@@ -476,6 +486,20 @@ if(window.BRIEF&&!window.BRIEF.offline){var f=document.createElement('link');f.r
   }
   $('top3').innerHTML=(B.top3||[]).map(function(t){var g=target(t); return '<li>'+(g?'<a href="#'+g+'" data-go="'+g+'">'+esc(t)+'</a>':esc(t))+'</li>'}).join('');
 
+  // 팀장 보고 한 장. 결론, 숫자, 원인 후보, 조치, 정해 주실 것 순서
+  var L=B.lead;
+  if(L){
+    h='<h3>팀장 보고 한 장 '+OLD(L)+'</h3><div class="sub">그대로 복사해 메신저나 메일에 붙여 넣는 보고 초안입니다. 원인은 후보이며 담당 확인 전입니다.</div>';
+    h+='<p class="lead-h">'+esc(L.headline)+'</p>';
+    if(L.numbers.length) h+='<div class="lead-n">'+L.numbers.map(function(n){return '<div><div class="l">'+esc(n[0])+(SAMPLE?' (가상)':'')+'</div><div class="x">'+esc(n[1])+'</div><div class="sub">'+esc(n[2])+'</div></div>'}).join('')+'</div>';
+    if(L.causes.length) h+='<div class="lead-s"><b>원인 후보(확인 전)</b><ul>'+L.causes.map(function(c){return '<li>'+esc(c)+'</li>'}).join('')+'</ul></div>';
+    h+='<div class="lead-s"><b>오늘 조치</b>'+(L.actions.length?'<ol>'+L.actions.map(function(a){return '<li><span class="k">'+esc(a[0])+'</span> '+esc(a[1])+'</li>'}).join('')+'</ol>':'<p>따로 챙길 일이 없습니다.</p>')
+      +(L.more?'<div class="sub">외 '+L.more+'건은 아래 오늘 할 일에 있습니다.</div>':'')+'</div>';
+    h+='<div class="lead-s"><b>정해 주실 것</b><ul>'+L.decide.map(function(d){return '<li>'+esc(d)+'</li>'}).join('')+'</ul></div>';
+    h+='<div class="acts">'+cbtn(L.text,'보고 글 복사')+' <a class="sub" href="lead.md">lead.md 받기</a></div>'+src(L.rule_text,L.source);
+    $('lead').innerHTML=h;
+  } else $('lead').hidden=true;
+
   // 오늘 할 일. 체크는 이 브라우저에만 날짜별로 남는다
   var todo=[];
   (B.top3||[]).forEach(function(t){ if(!/^(그 밖에|업무)/.test(t)) todo.push(['확인',t,target(t)]); });
@@ -483,14 +507,40 @@ if(window.BRIEF&&!window.BRIEF.offline){var f=document.createElement('link');f.r
   ((f&&f.items)||[]).forEach(function(i){ todo.push(['현장',i.place+': '+i.check,'c44']); });
   if(Cs&&Cs.drafts.length) todo.push(['협의',Cs.drafts.length+'명에게 협의 메모 보내기('+Cs.drafts.map(function(d){return d.to.replace(/ 담당$/,'')}).join(', ')+')','consult']);
   var seen={}; todo=todo.filter(function(x){if(seen[x[1]]) return false; seen[x[1]]=1; return true});
-  var KEY='todo-'+B.date, done={};
+  var KEY='todo-'+B.date, done={}, JKEY='judge-'+B.date, jd={};
+  try{jd=JSON.parse(localStorage.getItem(JKEY)||'{}')||{}}catch(e){}
   try{done=JSON.parse(localStorage.getItem(KEY)||'{}')||{}}catch(e){}
   function prog(){return todo.filter(function(x){return done[x[1]]}).length+' / '+todo.length+' 끝냄'}
   h='<h3>오늘 할 일</h3><div class="sub">오늘 볼 것, 오늘까지인 업무, 현장 점검, 보낼 협의 메모를 모았습니다. 체크는 이 PC 브라우저에만 남습니다. <span class="prog" id="prog">'+prog()+'</span></div>';
   h+=todo.length?'<ul class="todo">'+todo.map(function(x,n){
     return '<li'+(done[x[1]]?' class="done"':'')+'><input type="checkbox" id="td'+n+'"'+(done[x[1]]?' checked':'')+'><span class="k">'+esc(x[0])+'</span><label for="td'+n+'"><span class="t">'+esc(x[1])+'</span></label>'
+      +(x[0]==='확인'?'<span class="jg" data-n="'+n+'"><button type="button" data-j="moved"'+(jd[x[1]]==='moved'?' class="on"':'')+'>움직였다</button><button type="button" data-j="no"'+(jd[x[1]]==='no'?' class="on"':'')+'>볼 필요 없었다</button></span>':'')
       +(x[2]?'<a href="#'+x[2]+'" data-go="'+x[2]+'" class="sub">보기</a>':'')+'</li>'}).join('')+'</ul>':'<div class="empty">오늘 따로 챙길 일이 없습니다.</div>';
+  h+='<div class="acts"><button type="button" class="btn" id="jcsv">판단 기록 CSV 받기</button><span class="sub" id="jsum"></span></div>';
   $('todo').innerHTML=h;
+  // 알림 판단 기록. 4주 시범 통과 기준(움직인 비율 50% 이상)을 셀 때 쓴다
+  function jall(){
+    var rows=[];
+    try{for(var i=0;i<localStorage.length;i++){var k=localStorage.key(i); if(k.indexOf('judge-')!==0) continue;
+      var o=JSON.parse(localStorage.getItem(k)||'{}')||{}; for(var t in o) rows.push([k.slice(6),t,o[t]]);}}catch(e){}
+    return rows.sort(function(a,b){return a[0]<b[0]?-1:1});
+  }
+  function jsum(){
+    var r=jall(), m=r.filter(function(x){return x[2]==='moved'}).length;
+    $('jsum').textContent=r.length?'판단 기록 '+r.length+'건, 움직인 비율 '+Math.round(m/r.length*100)+'%(이 브라우저 기록)':'확인 항목마다 움직였는지 남기면 움직인 비율을 셉니다.';
+  }
+  jsum();
+  document.querySelectorAll('.jg button').forEach(function(bt){
+    bt.onclick=function(){var g=bt.parentNode, t=todo[+g.getAttribute('data-n')][1], j=bt.getAttribute('data-j');
+      if(jd[t]===j) delete jd[t]; else jd[t]=j;
+      g.querySelectorAll('button').forEach(function(x){x.className=jd[t]===x.getAttribute('data-j')?'on':''});
+      try{localStorage.setItem(JKEY,JSON.stringify(jd))}catch(e){} jsum();};
+  });
+  $('jcsv').onclick=function(){
+    var q=function(v){return '"'+String(v).replace(/"/g,'""')+'"'};
+    var csv='\ufeff날짜,항목,판단\n'+jall().map(function(x){return [x[0],q(x[1]),x[2]==='moved'?'움직였다':'볼 필요 없었다'].join(',')}).join('\n');
+    var a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'})); a.download='judge_log.csv'; a.click();
+  };
   document.querySelectorAll('.todo input').forEach(function(c){
     c.onchange=function(){var t=todo[+c.id.slice(2)][1]; if(c.checked) done[t]=1; else delete done[t];
       c.parentNode.className=c.checked?'done':''; try{localStorage.setItem(KEY,JSON.stringify(done))}catch(e){} $('prog').textContent=prog();};

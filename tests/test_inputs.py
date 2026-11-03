@@ -568,3 +568,48 @@ def test_unit_note_is_shown(tmp_path):
     b = main.run(NOW, tmp_path, None, lambda d: {})
     if b["sales"].get("unit_note"):
         assert "매출 단위" in (tmp_path / "output" / "site" / "brief.md").read_text(encoding="utf-8")
+
+
+def test_lead_report_one_page(tmp_path):
+    b = main.run(NOW, tmp_path, lambda now: ([], []), lambda d: {}, lambda j: None)
+    L = b["lead"]
+    assert L and not b["failures"] and len(L["numbers"]) == 3 and 0 < len(L["actions"]) <= 4
+    assert L["text"].startswith("[11/05(목) 아침 보고]") and "결론: " + L["headline"] in L["text"]
+    assert "원인 후보(확인 전)" in L["text"] or not L["causes"]
+    # 보고 속 % 숫자는 모두 판단 결과에 있는 숫자
+    judged = json.dumps({k: b[k] for k in ("sales", "promo_results", "touch", "tasks", "promos")}, ensure_ascii=False)
+    for n in re.findall(r"[+-]?(\d+(?:\.\d+)?)%", L["text"]):
+        assert n in judged, n
+    assert "·" not in L["text"] and "→" not in L["text"]
+    md = (tmp_path / "docs" / "lead.md").read_text(encoding="utf-8")
+    assert md.startswith("# 팀장 보고 한 장 2026-11-05") and L["text"] in md
+
+
+def test_lead_report_part_check_and_partial(tmp_path):
+    rows = []
+    for k in range(14, 0, -1):
+        d = (TODAY - dt.timedelta(days=k)).isoformat()
+        food = "80" if k == 1 else "100"
+        rows += [[d, "식품", food, "100", "100"], [d, "패션", "900", "900", "880"]]
+    s = judge.rule_sales(sales_rows(tmp_path, rows), TODAY)
+    assert s["status"] == "구분 확인"
+    food = next(p for p in s["parts"] if p["part"] == "식품")
+    assert food["last7_yoy_pct"] == -2.9
+    L = judge.lead_report(TODAY, {"sales": s})
+    assert "식품 매출이 전년 대비 -20.0%" in L["headline"] and "기준 안이지만" in L["headline"]
+    assert any("하루치 하락인지" in c for c in L["causes"]) and L["actions"][0][0] == "식품 영업 담당"
+    assert L["decide"] == ["오늘 정해 주실 것은 없습니다"]
+    rows += [[TODAY.isoformat(), "x", "1", "1", "1"]]  # 오늘 행은 무시된다
+    d = (TODAY - dt.timedelta(days=1)).isoformat()
+    rows = [r for r in rows if r[0] != d] + [[d, "식품", "20", "100", "100"], [d, "패션", "200", "900", "880"]]
+    L = judge.lead_report(TODAY, {"sales": judge.rule_sales(sales_rows(tmp_path, rows), TODAY)})
+    assert "새 파일을 받은 뒤 보고" in L["headline"] and not L["causes"]
+
+
+def test_plan_copy_waits_when_benefit_not_in_promos(tmp_path):
+    b = main.run(NOW, tmp_path, lambda now: ([], []), lambda d: {}, lambda j: None)
+    out = {k: b[k] for k in ("calendar", "pilot", "promo_results")}
+    out["promos"] = {"items": []}
+    cards = judge.plan_drafts(TODAY, out)["cards"]
+    assert cards and all(c["hold"] and c["copy_a"].startswith("[혜택 확정 후] ") for c in cards)
+    assert all(not c["hold"] for c in b["plan"]["cards"] if c["benefit_from"])
