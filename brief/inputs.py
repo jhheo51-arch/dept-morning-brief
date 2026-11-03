@@ -4,8 +4,11 @@
 """
 import csv
 import datetime as dt
+import glob
 import io
+import os
 import re
+from pathlib import Path
 
 from . import rules_config as C
 
@@ -58,7 +61,23 @@ class InputError(ValueError):
     pass
 
 
+# 이번 실행에서 읽은 파일 {이름: 경로}. 화면에 어느 파일을 읽었는지와 받은 시각을 적는 데 쓴다
+READ = {}
+
+
+def _newest(pattern):
+    """경로 패턴에 맞는 xlsx, csv 중 가장 최근에 바뀐 파일. 엑셀이 열어 둔 임시 파일(~$)은 뺀다."""
+    pattern = os.path.expandvars(os.path.expanduser(pattern))
+    if not Path(pattern).is_absolute():
+        pattern = str(C.ROOT / pattern)
+    hits = [Path(h) for h in glob.glob(pattern)]
+    hits = [h for h in hits if h.is_file() and h.suffix.lower() in (".xlsx", ".csv") and not h.name.startswith("~$")]
+    return max(hits, key=lambda h: h.stat().st_mtime) if hits else None
+
+
 def find(name, folder=None):
+    if C.SOURCES.get(name):
+        return _newest(C.SOURCES[name])
     folder = folder or C.INPUT_DIR
     for ext in (".xlsx", ".csv"):
         p = folder / f"{name}{ext}"
@@ -98,6 +117,7 @@ def read_table(name, folder=None, today=None):
     p = find(name, folder)
     if p is None:
         return None
+    READ[name] = p
     try:
         cells = _cells(p)
     except UnicodeDecodeError:

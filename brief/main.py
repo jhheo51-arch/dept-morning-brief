@@ -25,6 +25,17 @@ class LeakError(RuntimeError):
     pass
 
 
+def read_files(today):
+    """읽은 파일과 바뀐 시각. 내 데이터 모드에서 오늘 전에 바뀐 파일은 old 로 표시한다(BI가 새 파일을 못 떨어뜨린 날)."""
+    rows = []
+    for name, p in sorted(I.READ.items()):
+        at = dt.datetime.fromtimestamp(p.stat().st_mtime)
+        rows.append({"name": name, "file": p.name, "from": "BI 폴더" if C.SOURCES.get(name) else "입력 폴더",
+                     "modified": at.isoformat(timespec="minutes"),
+                     "old": not C.SAMPLE and at.date() < today})
+    return rows
+
+
 def _load(path):
     try:
         return json.loads(path.read_text(encoding="utf-8"))
@@ -62,6 +73,7 @@ def run(now=None, root=ROOT, review_fetch=None, weather_fetch=None, summarizer=N
     prev = _load(data / "latest.json")
     last_ok = dict(prev.get("last_ok", {}))
     failures, texts, out, missing, empty = [], [], {}, [], []
+    I.READ.clear()
     review_fetch = review_fetch or collect.fetch_reviews
     weather_fetch = weather_fetch or collect.fetch_weather
 
@@ -177,6 +189,7 @@ def run(now=None, root=ROOT, review_fetch=None, weather_fetch=None, summarizer=N
         "failures": failures,
         "missing": missing,
         "empty": empty,
+        "files": read_files(today),
         "offline": C.OFFLINE,
         "review_on": bool(C.APP_ID),
         "last_ok": last_ok,

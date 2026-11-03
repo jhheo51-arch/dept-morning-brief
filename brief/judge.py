@@ -923,7 +923,7 @@ def lead_report(today, out):
     thr = C.SALES.get("yoy_alert_pct", -10)
     head, numbers, causes, focus = "", [], [], None
     if not s:
-        head = "매출 파일이 없어 오늘은 행사와 업무만 보고합니다."
+        head = "매출은 사내 BI 기준으로 보시고, 이 보고는 행사 준비와 업무만 다룹니다."
     else:
         t, d = s["total"], md(s["date"])
         tl = f"목표 {t['achieve_pct']}%, 전년 대비 {_sign(t['yoy_pct'])}"

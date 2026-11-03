@@ -188,6 +188,10 @@ def brief_markdown(b):
         lines += [f"실패: {', '.join(f['step'] for f in b['failures'])}. "
                   "실패한 블록은 마지막 성공 결과를 보여 줍니다.", ""]
         lines += [f"- {f['message']}" for f in b["failures"] if f.get("message")]
+    old = [f for f in b.get("files", []) if f["old"]]
+    if old:
+        lines += ["오늘 전에 바뀐 파일: " + ", ".join(f"{f['file']}({f['modified'][5:10].replace('-', '/')})" for f in old)
+                  + ". 어제 자료가 맞는지 보고 쓰세요", ""]
     if b.get("missing"):
         lines += [f"아직 없는 파일: {', '.join(b['missing'])}(넣으면 그 블록이 나옵니다)", ""]
     if b.get("empty"):

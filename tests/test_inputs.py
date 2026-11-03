@@ -645,3 +645,40 @@ def test_plan_copy_waits_when_benefit_not_in_promos(tmp_path):
     cards = judge.plan_drafts(TODAY, out)["cards"]
     assert cards and all(c["hold"] and c["copy_a"].startswith("[혜택 확정 후] ") for c in cards)
     assert all(not c["hold"] for c in b["plan"]["cards"] if c["benefit_from"])
+
+
+def test_sources_reads_newest_file_from_bi_folder(tmp_path, monkeypatch):
+    """[sources] 경로 패턴이 있으면 inputs/ 대신 그 폴더의 가장 최근 파일을 읽고, 오늘 전에 바뀐 파일은 old 로 표시한다."""
+    import os
+    bi = tmp_path / "bi"
+    write_csv(bi, "일매출_1101", ["날짜", "구분", "매출"], [["2026-11-01", "식품", 100]])
+    write_csv(bi, "일매출_1104", ["날짜", "구분", "매출"], [["2026-11-04", "식품", 200]])
+    (bi / "~$일매출_1105.xlsx").write_bytes(b"")  # 엑셀이 열어 둔 임시 파일은 건너뜀
+    old, new = bi / "일매출_1101.csv", bi / "일매출_1104.csv"
+    os.utime(old, (1, dt.datetime(2026, 11, 1, 18).timestamp()))
+    os.utime(new, (1, dt.datetime(2026, 11, 4, 18).timestamp()))
+    monkeypatch.setattr(C, "SOURCES", {"sales": str(bi / "일매출_*")})
+    monkeypatch.setattr(C, "SAMPLE", False)
+    I.READ.clear()
+    rows = I.read_table("sales", tmp_path / "inputs")
+    assert rows[0]["날짜"] == "2026-11-04"
+    files = main.read_files(TODAY)
+    assert files == [{"name": "sales", "file": "일매출_1104.csv", "from": "BI 폴더",
+                      "modified": "2026-11-04T18:00", "old": True}]
+    assert main.read_files(dt.date(2026, 11, 4))[0]["old"] is False
+    monkeypatch.setattr(C, "SOURCES", {"sales": str(bi / "없는_*.xlsx")})
+    assert I.read_table("sales", tmp_path / "inputs") is None
+
+
+def test_minimal_setup_without_sales(tmp_path):
+    """사내 BI가 있을 때 최소 구성: 매출 파일 없이 행사, 업무, 현장 기록만으로도 화면과 팀장 보고가 만들어진다."""
+    import shutil
+    real_mode(tmp_path)
+    (tmp_path / "inputs").mkdir()
+    for name in ("promotions", "tasks", "field_log"):
+        shutil.copyfile(C.ROOT / "samples" / f"{name}.csv", tmp_path / "inputs" / f"{name}.csv")
+    b = main.run(dt.datetime(2026, 11, 3, 7, 0, tzinfo=KST), tmp_path, None, lambda d: {})
+    assert b["sales"] is None and b["promo_results"] is None and "sales.xlsx" in b["missing"]
+    assert b["promos"]["items"] and b["tasks"]["items"] and not b["failures"]
+    assert {f["name"] for f in b["files"]} == {"promotions", "tasks", "field_log"}
+    assert "행사 준비와 업무만" in (tmp_path / "output/site/lead.md").read_text(encoding="utf-8")

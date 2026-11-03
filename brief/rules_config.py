@@ -66,6 +66,8 @@ def load(paths=None):
     g["INPUT_DIR"] = ROOT / ("samples" if SAMPLE else run.get("input_dir", "inputs"))
     g["SITE_DIR"] = ROOT / ("docs" if SAMPLE else run.get("output_dir", "output") + "/site")
     g["DATA_DIR"] = ROOT / ("data" if SAMPLE else run.get("output_dir", "output") + "/data")
+    # 사내 BI가 파일을 떨어뜨리는 곳. 파일 이름마다 경로 패턴을 적으면 inputs/ 대신 가장 최근 파일을 읽는다
+    g["SOURCES"] = {} if SAMPLE else dict(cfg.get("sources", {}))
 
     rv = cfg["reviews"]
     g["APP_ID"], g["APP_NAME"] = rv.get("app_id", ""), rv.get("app_name", "앱")

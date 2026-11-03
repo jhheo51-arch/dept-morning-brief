@@ -113,7 +113,8 @@ details.archive summary{cursor:pointer; font-weight:700; font-size:14px}
 .todo label{flex:1 1 auto; cursor:pointer}
 .jg{display:flex; gap:4px; flex:0 0 auto} .jg button{font:inherit; font-size:12px; cursor:pointer; background:var(--bg); border:1px solid var(--line); border-radius:6px; padding:2px 7px; color:var(--muted)}
 .jg button.on{background:var(--green-d); border-color:var(--green-d); color:#fff}
-@media print{.jg,#jcsv{display:none}}
+@media print{.jg,#jcsv,.tm{display:none}}
+.tm label input{width:4.5em;margin-left:4px;background:var(--card);color:var(--ink);border:1px solid var(--line);border-radius:6px;padding:2px 6px}
 .todo .k{flex:0 0 auto; font-size:11.5px; font-weight:700; color:var(--muted); background:var(--bg); border-radius:4px; padding:1px 6px; margin-top:2px}
 .todo li.done span.t{color:var(--muted); text-decoration:line-through}
 .todo a{flex:0 0 auto; color:var(--green-d)}
@@ -218,6 +219,8 @@ if(window.BRIEF&&!window.BRIEF.offline){var f=document.createElement('link');f.r
   $('foot').innerHTML=(SAMPLE?'공개 데이터와 가상 데이터만 씁니다. 현대백화점 내부 자료가 아닙니다.':'내 파일로 만든 점검입니다. 판단은 규칙 문장대로이며, 최종 결정은 담당자가 합니다.')+repo;
   var al='';
   if(B.error) al+='<div class="alert"><b>실행 실패</b> '+esc(B.error.at)+', 실패 단계 '+esc(B.error.step)+'. 아래는 마지막 성공('+esc(B.error.last_success)+') 결과입니다.</div>';
+  var old=(B.files||[]).filter(function(f){return f.old});
+  if(old.length) al+='<div class="alert"><b>오늘 전에 바뀐 파일</b>: '+old.map(function(f){return esc(f.file)+'('+esc(f.from)+', '+esc(f.modified.slice(5,16).replace('-','/').replace('T',' '))+')'}).join(', ')+'. 어제 자료가 맞는지 보고 쓰세요.</div>';
   (B.failures||[]).forEach(function(f){ al+='<div class="alert"><b>'+esc(f.step)+' 실패</b>'+(f.message?': '+esc(f.message):'')+'. 마지막 성공 '+esc(f.last_success||'없음')+', 해당 블록은 그때 결과이거나 비어 있습니다.</div>'; });
   $('alerts').innerHTML=al;
   $('top3').innerHTML=(B.top3||[]).map(function(t){return '<li>'+esc(t)+'</li>'}).join('');
@@ -525,7 +528,35 @@ if(window.BRIEF&&!window.BRIEF.offline){var f=document.createElement('link');f.r
       +(x[0]==='확인'?'<span class="jg" data-n="'+n+'"><button type="button" data-j="moved"'+(jd[x[1]]==='moved'?' class="on"':'')+'>움직였다</button><button type="button" data-j="no"'+(jd[x[1]]==='no'?' class="on"':'')+'>볼 필요 없었다</button></span>':'')
       +(x[2]?'<a href="#'+x[2]+'" data-go="'+x[2]+'" class="sub">보기</a>':'')+'</li>'}).join('')+'</ul>':'<div class="empty">오늘 따로 챙길 일이 없습니다.</div>';
   h+='<div class="acts"><button type="button" class="btn" id="jcsv">판단 기록 CSV 받기</button><span class="sub" id="jsum"></span></div>';
+  h+='<div class="acts tm"><button type="button" class="btn" id="tstart">아침 점검 시작</button><button type="button" class="btn" id="tend">팀장 보고 마침</button>'
+    +'<label class="sub">엑셀 넣은 분 <input type="number" min="0" max="180" id="tin" inputmode="numeric"></label>'
+    +'<button type="button" class="btn" id="tcsv">시간 기록 CSV 받기</button><span class="sub" id="tsum"></span></div>';
+  if((B.files||[]).length) h+='<details class="src"><summary>읽은 파일</summary><p>'+B.files.map(function(f){return esc(f.file)+'('+esc(f.from)+', 바뀐 시각 '+esc(f.modified.replace('T',' '))+')'}).join('<br>')+'</p></details>';
   $('todo').innerHTML=h;
+  // 아침 점검 시간. 4주 시범의 '출근부터 팀장 보고까지', '엑셀 넣는 시간' 기준을 잴 때 쓴다(이 브라우저에만 남음)
+  var TKEY='time-'+B.date, tm={};
+  try{tm=JSON.parse(localStorage.getItem(TKEY)||'{}')||{}}catch(e){}
+  function hm(s){return s?s.slice(11,16):''}
+  function mins(o){return o.start&&o.end?Math.round((new Date(o.end)-new Date(o.start))/60000):null}
+  function tsave(){try{localStorage.setItem(TKEY,JSON.stringify(tm))}catch(e){} tshow();}
+  function tshow(){
+    var m=mins(tm);
+    $('tsum').textContent=tm.start?'시작 '+hm(tm.start)+(tm.end?', 마침 '+hm(tm.end)+', '+m+'분':', 진행 중')+(tm.input!=null?', 엑셀 '+tm.input+'분':''):'시작과 마침을 누르면 보고까지 걸린 분을 셉니다.';
+    $('tin').value=tm.input!=null?tm.input:'';
+  }
+  function nowiso(){var d=new Date(); return new Date(d-d.getTimezoneOffset()*60000).toISOString().slice(0,19)}
+  $('tstart').onclick=function(){tm.start=nowiso(); delete tm.end; tsave();};
+  $('tend').onclick=function(){if(!tm.start) tm.start=nowiso(); tm.end=nowiso(); tsave();};
+  $('tin').onchange=function(){var v=parseInt($('tin').value,10); if(isNaN(v)||v<0) delete tm.input; else tm.input=v; tsave();};
+  $('tcsv').onclick=function(){
+    var rows=[];
+    try{for(var i=0;i<localStorage.length;i++){var k=localStorage.key(i); if(k.indexOf('time-')!==0) continue;
+      var o=JSON.parse(localStorage.getItem(k)||'{}')||{}; rows.push([k.slice(5),hm(o.start),hm(o.end),mins(o)==null?'':mins(o),o.input==null?'':o.input]);}}catch(e){}
+    rows.sort(function(a,b){return a[0]<b[0]?-1:1});
+    var csv='﻿날짜,시작,보고 마침,걸린 분,엑셀 넣은 분\n'+rows.map(function(r){return r.join(',')}).join('\n');
+    var a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'})); a.download='time_log.csv'; a.click();
+  };
+  tshow();
   // 알림 판단 기록. 4주 시범 통과 기준(움직인 비율 50% 이상)을 셀 때 쓴다
   function jall(){
     var rows=[];
