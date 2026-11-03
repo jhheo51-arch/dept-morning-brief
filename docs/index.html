@@ -132,6 +132,7 @@ section{scroll-margin-top:64px}
   body{background:#fff} .card,.headline{break-inside:avoid; border:1px solid #ddd} details.src{display:none}
 }
 footer{font-size:13px; color:var(--muted); text-align:center; margin-top:24px}
+footer a, details a{color:var(--green-d)}
 @media (max-width:760px){
   .wrap{padding:16px 16px 48px} .grid2{grid-template-columns:1fr} .meta{text-align:left}
   .kpis{grid-template-columns:repeat(3,1fr)} .kpi .n{font-size:22px} .headline ol{font-size:15.5px}
@@ -531,7 +532,7 @@ if(window.BRIEF&&!window.BRIEF.offline){var f=document.createElement('link');f.r
   h+='<div class="acts tm"><button type="button" class="btn" id="tstart">아침 점검 시작</button><button type="button" class="btn" id="tend">팀장 보고 마침</button>'
     +'<label class="sub">엑셀 넣은 분 <input type="number" min="0" max="180" id="tin" inputmode="numeric"></label>'
     +'<button type="button" class="btn" id="tcsv">시간 기록 CSV 받기</button><span class="sub" id="tsum"></span></div>';
-  if((B.files||[]).length) h+='<details class="src"><summary>읽은 파일</summary><p>'+B.files.map(function(f){return esc(f.file)+'('+esc(f.from)+', 바뀐 시각 '+esc(f.modified.replace('T',' '))+')'}).join('<br>')+'</p></details>';
+  if((B.files||[]).length) h+='<details class="src"><summary>읽은 파일</summary><p>'+B.files.map(function(f){return esc(f.file)+'('+esc(f.from)+(f.modified?', 바뀐 시각 '+esc(f.modified.replace('T',' ')):', 시연용 가상 파일')+')'}).join('<br>')+'</p></details>';
   $('todo').innerHTML=h;
   // 아침 점검 시간. 4주 시범의 '출근부터 팀장 보고까지', '엑셀 넣는 시간' 기준을 잴 때 쓴다(이 브라우저에만 남음)
   var TKEY='time-'+B.date, tm={};

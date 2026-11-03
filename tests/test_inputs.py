@@ -682,3 +682,10 @@ def test_minimal_setup_without_sales(tmp_path):
     assert b["promos"]["items"] and b["tasks"]["items"] and not b["failures"]
     assert {f["name"] for f in b["files"]} == {"promotions", "tasks", "field_log"}
     assert "행사 준비와 업무만" in (tmp_path / "output/site/lead.md").read_text(encoding="utf-8")
+
+
+def test_lead_report_with_no_data_yet(tmp_path):
+    """양식만 만들고 아무것도 넣지 않은 첫날에는 BI 안내가 아니라 자료를 넣으라고 쓴다."""
+    real_mode(tmp_path)
+    b = main.run(NOW, tmp_path, None, lambda d: {})
+    assert b["lead"]["headline"].startswith("아직 넣은 자료가 없어")

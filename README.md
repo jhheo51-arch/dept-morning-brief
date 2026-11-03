@@ -316,7 +316,7 @@ touchpoints = [
 | 설정 | `config.toml` 위에 `config.local.toml`을 덮음 | `brief/rules_config.py` |
 | 입력 | 엑셀과 CSV 읽기, 열 이름 짝짓기, 열과 칸 검사 | `brief/inputs.py`, 양식은 `brief/init.py` |
 | 수집 | 앱 리뷰, 7일 예보, 공휴일 | `brief/collect.py` |
-| 판단 | 규칙 8개, 주간 정리, 협의 초안, 기획 초안, 팀장 보고 | `brief/judge.py` |
+| 판단 | 규칙 9개, 주간 정리, 협의 초안, 기획 초안, 팀장 보고 | `brief/judge.py` |
 | 작성 | 오늘 볼 것 세 가지, 3문장 요약, 화면 데이터, 주간 정리, 협의 초안, 기획 초안, 팀장 보고 글 | `brief/write.py`, `docs/index.html` |
 | 검증 | 리뷰 알림 규칙을 실제 리뷰 1년치로 매일 다시 돌려 봄 | `scripts/backtest_reviews.py`, 결과 `docs/backtest_reviews.json` |
 | 알림 | 웹훅으로 세 가지 보내기 | `brief/notify.py` |

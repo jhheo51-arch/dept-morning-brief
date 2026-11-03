@@ -19,35 +19,35 @@
    "name": "field_log",
    "file": "field_log.csv",
    "from": "입력 폴더",
-   "modified": "2026-11-03T11:20",
+   "modified": null,
    "old": false
   },
   {
    "name": "promotions",
    "file": "promotions.csv",
    "from": "입력 폴더",
-   "modified": "2026-11-03T11:20",
+   "modified": null,
    "old": false
   },
   {
    "name": "sales",
    "file": "sales.csv",
    "from": "입력 폴더",
-   "modified": "2026-11-03T11:20",
+   "modified": null,
    "old": false
   },
   {
    "name": "tasks",
    "file": "tasks.csv",
    "from": "입력 폴더",
-   "modified": "2026-11-03T11:20",
+   "modified": null,
    "old": false
   },
   {
    "name": "touchpoint_daily",
    "file": "touchpoint_daily.csv",
    "from": "입력 폴더",
-   "modified": "2026-11-03T11:20",
+   "modified": null,
    "old": false
   }
  ],

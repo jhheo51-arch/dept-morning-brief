@@ -31,7 +31,8 @@ def read_files(today):
     for name, p in sorted(I.READ.items()):
         at = dt.datetime.fromtimestamp(p.stat().st_mtime)
         rows.append({"name": name, "file": p.name, "from": "BI 폴더" if C.SOURCES.get(name) else "입력 폴더",
-                     "modified": at.isoformat(timespec="minutes"),
+                     # 시연 파일은 실행 때마다 새로 만들어지므로 시각을 남기지 않는다
+                     "modified": None if C.SAMPLE else at.isoformat(timespec="minutes"),
                      "old": not C.SAMPLE and at.date() < today})
     return rows
 

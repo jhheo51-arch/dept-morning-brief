@@ -922,7 +922,9 @@ def lead_report(today, out):
     s = out.get("sales")
     thr = C.SALES.get("yoy_alert_pct", -10)
     head, numbers, causes, focus = "", [], [], None
-    if not s:
+    if not s and not any(out.get(k) for k in ("promos", "tasks", "touch")):
+        head = "아직 넣은 자료가 없어 보고할 내용이 없습니다. 양식에 자료를 붙여 넣으면 다음 실행부터 나옵니다."
+    elif not s:
         head = "매출은 사내 BI 기준으로 보시고, 이 보고는 행사 준비와 업무만 다룹니다."
     else:
         t, d = s["total"], md(s["date"])
