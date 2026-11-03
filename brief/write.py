@@ -160,6 +160,8 @@ def brief_markdown(b):
     lines = [f"# 아침 점검 {b['date']}", "", "## 오늘 볼 것"]
     lines += [f"{i}. {t}" for i, t in enumerate(b["top3"], 1)]
     lines += ["", "## 요약", b["summary"], ""]
+    if (b.get("sales") or {}).get("unit_note"):
+        lines += [f"매출 단위: {b['sales']['unit_note']}", ""]
     t = b.get("tasks")
     if t and t["items"]:
         head = "## 업무" + (f" ({t.get('stale_from') or '지난'} 결과, 오늘 읽기 실패)" if t.get("stale") else "")

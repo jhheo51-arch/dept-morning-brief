@@ -180,7 +180,8 @@ if(window.BRIEF&&!window.BRIEF.offline){var f=document.createElement('link');f.r
   if(S){
     var t=S.total, m=S.mtd, w=S.last7;
     h+='<div class="sub">'+esc(S.date)+' 마감 기준'+(S.stale_days>1?' ('+S.stale_days+'일 전 자료)':'')
-      +'<span class="tag '+(S.status==='확인 필요'?'warn':'ok')+'">'+esc(S.status)+'</span></div>';
+      +'<span class="tag '+(S.status==='확인 필요'?'warn':'ok')+'">'+esc(S.status)+'</span></div>'
+      +(S.unit_note?'<div class="sub">'+esc(S.unit_note)+'</div>':'');
     function k(lab,n,unit,sub,cls){return '<div class="kpi '+(cls||'')+'"><div class="l">'+lab+'</div><div class="n">'+n+(unit?'<small>'+unit+'</small>':'')+'</div><div class="s">'+sub+'</div></div>'}
     var lowA=t.achieve_pct!=null&&t.achieve_pct<S.target_alert_pct, lowY=t.yoy_pct!=null&&t.yoy_pct<=S.yoy_alert_pct;
     h+='<div class="kpis">'+k('어제 매출',esc(t.sales_text),'','목표 '+(t.achieve_pct==null?'없음':t.achieve_pct+'%'),lowA?'o':'g')

@@ -83,6 +83,7 @@ def load(paths=None):
     g["CONSULT"] = cfg.get("consult", {})
     g["PLAN"] = cfg.get("plan", {})
     g["TASKS"] = cfg.get("tasks", {})
+    g["WEEKLY"] = cfg.get("weekly", {})
 
     p = cfg["pilot"]
     g["PILOT_START"] = p["start"] if isinstance(p["start"], dt.date) else dt.date.fromisoformat(p["start"])

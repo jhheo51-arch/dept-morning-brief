@@ -101,13 +101,22 @@ def rule_sales(rows, today):
             f.append(f"목표 달성 {m['achieve_pct']}%(기준 {tgt_thr}% 미만)")
         return f
     reasons = flags(t)
+    # 어제 매출이 최근 같은 요일 평균의 일부뿐이면 중간 집계 파일일 수 있다. 이때는 구분별 경고를 내지 않고 파일부터 묻는다
+    partial_pct = C.SALES.get("partial_pct", 50)
+    same = [totals[d]["sales"] for d in days if d < day and (day - d).days % 7 == 0 and (day - d).days <= 28
+            and totals[d]["sales"]]
+    partial = None
+    if same and t["sales"] is not None and t["sales"] < sum(same) / len(same) * partial_pct / 100:
+        partial = round(t["sales"] / (sum(same) / len(same)) * 100, 1)
+        reasons = [f"{day.month}/{day.day} 매출이 최근 같은 요일 평균의 {partial}%라 집계가 덜 된 파일일 수 있습니다. "
+                   "새 파일을 받아 다시 돌려 주세요"]
     parts = []
     for name, x in sorted(by_day[day].items(), key=lambda kv: -(kv[1]["sales"] or 0)):
         if name == total_name:
             continue
         m = metrics(x)
-        parts.append({"part": name, **m, "flags": flags(m)})
-    if last7["yoy_pct"] is not None and last7["yoy_pct"] <= yoy_thr:
+        parts.append({"part": name, **m, "flags": [] if partial else flags(m)})
+    if not partial and last7["yoy_pct"] is not None and last7["yoy_pct"] <= yoy_thr:
         reasons.append(f"최근 7일 전년 대비 {last7['yoy_pct']}%")
     series = [{"date": d.isoformat(), "sales": totals[d]["sales"], "prev": totals[d]["prev"],
                "target": totals[d]["target"]} for d in days[-30:]]
@@ -115,6 +124,7 @@ def rule_sales(rows, today):
         "rule": "매출 현황",
         "date": day.isoformat(),
         "stale_days": (today - day).days,
+        "partial_pct": partial,
         "total": t, "mtd": mtd, "last7": last7,
         "parts": parts,
         "parts_flagged": [p["part"] for p in parts if p["flags"]],
@@ -122,7 +132,8 @@ def rule_sales(rows, today):
         "reasons": reasons or [f"전년 대비 {yoy_thr}% 초과, 목표 {tgt_thr}% 이상"],
         "series30": series,
         "yoy_alert_pct": yoy_thr, "target_alert_pct": tgt_thr,
-        "rule_text": f"어제 또는 최근 7일 전년 대비 {yoy_thr}% 이하, 어제 목표 달성 {tgt_thr}% 미만이면 확인 필요",
+        "rule_text": f"어제 또는 최근 7일 전년 대비 {yoy_thr}% 이하, 어제 목표 달성 {tgt_thr}% 미만이면 확인 필요. "
+                     f"어제가 최근 같은 요일 평균의 {partial_pct}% 미만이면 덜 된 집계로 보고 구분 경고를 멈춤",
         "unit_note": I.unit_note(rows),
         "source": _src(rows[0]["_file"]) + (f". {I.unit_note(rows)}" if I.unit_note(rows) else ""),
     }
@@ -227,6 +238,12 @@ def rule_tasks(rows, today):
     }
 
 
+def _days_apart(a, b):
+    if not a or not b:
+        return 0 if a == b else 99
+    return abs((dt.date.fromisoformat(a) - dt.date.fromisoformat(b)).days)
+
+
 def merge_task_archive(archive, tasks, today):
     """완료 업무를 보관 목록에 쌓는다. 엑셀에서 행을 지워도 남고, 상태를 다시 비우면 보관에서 뺀다."""
     keep = C.TASKS.get("archive_days", 90)
@@ -235,6 +252,11 @@ def merge_task_archive(archive, tasks, today):
         box.pop((i["name"], i["due"]), None)
     for c in tasks["closed_now"]:
         old = box.get((c["name"], c["due"]), {})
+        if not old:  # 완료한 뒤 기한만 고친 경우. 같은 이름에 기한 차이가 7일 미만이면 같은 업무로 본다(매주 하는 일은 따로 남음)
+            for k, a in list(box.items()):
+                if k[0] == c["name"] and _days_apart(a["due"], c["due"]) < 7:
+                    old = box.pop(k)
+                    break
         box[(c["name"], c["due"])] = dict(c, done_on=c["done_on"] or old.get("done_on") or today.isoformat())
     cut = (today - dt.timedelta(days=keep)).isoformat()
     return sorted((a for a in box.values() if a["done_on"] >= cut), key=lambda a: (a["done_on"], a["name"]),
@@ -647,6 +669,11 @@ def rule_field(review, calendar, log=None, today=None, touch=None):
 
 
 # 주간 정리
+def _md(x):
+    """붙여 넣는 글의 날짜는 협의 초안과 같이 11/02 로 쓴다."""
+    return x[5:].replace("-", "/")
+
+
 def week_summary(today, out, field_log=None, archive=None):
     """지난 7일(어제까지)을 한 장으로. 오늘 판단 결과와 현장 기록에서 묶는다. 새로 세는 것은 기간 합과 일수뿐."""
     end = today - dt.timedelta(days=1)
@@ -657,7 +684,7 @@ def week_summary(today, out, field_log=None, archive=None):
     if sales:
         w = sales["last7"]
         days = [x for x in sales.get("series30", []) if start.isoformat() <= x["date"] <= end.isoformat()]
-        low = [x["date"][5:] for x in days
+        low = [_md(x["date"]) for x in days
                if x["target"] and x["sales"] < x["target"] * sales["target_alert_pct"] / 100]
         lines = [f"7일 매출{v} {_won(w['sales'])}"
                  + (f", 목표 {w['achieve_pct']}%" if w["achieve_pct"] is not None else "")
@@ -673,20 +700,20 @@ def week_summary(today, out, field_log=None, archive=None):
             if i.get("growth") is None:
                 lines.append(f"{i['name']}: {i.get('note', '견줄 자료 없음')}")
                 continue
-            lines.append(f"{i['name']}({i['part']}, {i['start'][5:]}~{i['to'][5:]}): {i['sales_text']}, "
+            lines.append(f"{i['name']}({i['part']}, {_md(i['start'])}~{_md(i['to'])}): {i['sales_text']}, "
                          f"앞 같은 요일 기간 대비 {i['growth']:+}%" + (", 확인 필요" if i["flag"] else ""))
         sections.append({"title": "행사 성과", "lines": lines})
     promos = out.get("promos")
     if promos:
         nxt = [i for i in promos["items"] if i["start"] > today.isoformat()]
-        lines = [f"{i['name']} {i['start'][5:]} 시작" + (f", {', '.join(i['warns'])}" if i["warns"] else "")
+        lines = [f"{i['name']} {_md(i['start'])} 시작" + (f", {', '.join(i['warns'])}" if i["warns"] else "")
                  for i in nxt]
         sections.append({"title": "다음 7일 시작 행사", "lines": lines or ["없음"]})
     tasks = out.get("tasks")
     if tasks and not tasks.get("stale"):
         fin = [a for a in archive or [] if a.get("done_on") and start.isoformat() <= a["done_on"] <= today.isoformat()]
         lines = [f"끝낸 업무 {len(fin)}건, 남은 업무 {len(tasks['items'])}건(기한 지남 {tasks['overdue']}건)"]
-        lines += [f"{a['done_on'][5:]} 완료: {a['name']}" for a in sorted(fin, key=lambda a: a["done_on"])]
+        lines += [f"{_md(a['done_on'])} 완료: {a['name']}" for a in sorted(fin, key=lambda a: a["done_on"])]
         lines += [f"남음: {t['name']} ({t['phase']})" for t in tasks["items"] if t["warn"]]
         sections.append({"title": "업무", "lines": lines})
     if field_log is not None:
@@ -698,7 +725,7 @@ def week_summary(today, out, field_log=None, archive=None):
         week.sort()
         cnt = collections.Counter(x[2] for x in week)
         lines = [f"현장 기록 {len(week)}건" + (f"({', '.join(f'{k} {n}건' for k, n in cnt.most_common())})" if week else "")]
-        lines += [f"{d.isoformat()[5:]} {p}: {res_}" + (f", {m}" if m else "") for d, p, res_, m in week
+        lines += [f"{_md(d.isoformat())} {p}: {res_}" + (f", {m}" if m else "") for d, p, res_, m in week
                   if res_ != "정상"]
         sections.append({"title": "현장 조치", "lines": lines})
     touch = out.get("touch")
@@ -714,8 +741,44 @@ def week_summary(today, out, field_log=None, archive=None):
     if pilot:
         sections.append({"title": "시범" + ("(가상)" if pilot.get("virtual") else ""),
                          "lines": [f"{pilot.get('week_label', '')}: {pilot['decision']}"]})
+    sections.append({"title": "다음 주 점검", "lines": next_week_checks(today, out, start, end)})
     return {"rule": "주간 정리", "from": start.isoformat(), "to": end.isoformat(), "sections": sections,
             "source": "오늘 판단 결과와 현장 기록(field_log). 주간 보고 초안이며 문장은 담당자가 다듬습니다"}
+
+
+WEEKDAYS = "월화수목금토일"
+
+
+def next_week_checks(today, out, start, end):
+    """오늘부터 7일 안에 챙길 것. 판단 결과에서 뽑은 항목 뒤에 설정 [weekly] checks의 요일별 반복 점검을 붙인다."""
+    until = today + dt.timedelta(days=6)
+    lines = []
+    sales = out.get("sales")
+    if sales and sales.get("partial_pct") is not None:
+        lines.append(f"매출 파일 다시 받기: {_md(sales['date'])} 매출이 같은 요일 평균의 {sales['partial_pct']}%")
+    tasks = out.get("tasks")
+    if tasks and not tasks.get("stale"):
+        lines += [f"{_md(t['due'])} 기한: {t['name']}" + (f" ({t['owner']} 담당)" if t["owner"] else "")
+                  + (" 기한 지남" if t["left"] < 0 else "")
+                  for t in tasks["items"] if t["left"] is not None and t["left"] <= 6]
+    promos = out.get("promos")
+    if promos:
+        lines += [f"{_md(i['start'])} 시작 전 확인: {i['name']}, {', '.join(i['warns'])}" for i in promos["items"]
+                  if today.isoformat() <= i["start"] <= until.isoformat() and i["warns"] and not i.get("handled")]
+    res = out.get("promo_results")
+    if res:
+        lines += [f"결과 보고: {i['name']}, {_md(i['to'])} 끝" + (", 성과 낮음 원인 정리" if i["flag"] else "")
+                  for i in res["items"] if start.isoformat() <= i["to"] <= end.isoformat()]
+    repeat = []
+    for c in C.WEEKLY.get("checks", []):
+        day, _, what = str(c).partition(":")
+        if day.strip() in WEEKDAYS and what.strip():
+            d = today + dt.timedelta(days=(WEEKDAYS.index(day.strip()) - today.weekday()) % 7)
+            repeat.append((d, f"{_md(d.isoformat())}({day.strip()}) {what.strip()}"))
+        elif str(c).strip():
+            repeat.append((until, str(c).strip()))
+    lines += [x for _, x in sorted(repeat, key=lambda r: r[0])]
+    return lines or ["없음"]
 
 
 # 협의 초안
@@ -807,13 +870,17 @@ def plan_drafts(today, out):
     for n, row in picked.items():
         p = C.PLAN[n]
         d = dt.date.fromisoformat(row["date"])
-        end = row.get("ending", [])
+        low_names = {i["name"] for i in low}
+        end = [e for e in row.get("ending", []) if e not in low_names]
         notes = []
+        cut = [e for e in row.get("ending", []) if e in low_names]
+        if cut:
+            notes.append(f"{', '.join(cut)}은 성과가 낮아 마지막 날 문구에서 뺐습니다. 마감 할인을 할지 따로 정합니다.")
         if n == "1" and pilot.get("decision") and pilot["decision"] != "집계 전":
             notes.append(f"진행 중인 시범{v} 신호는 {pilot['decision']}입니다. "
                          + ("문구 B나 대상 조건을 바꾼 안을 함께 올립니다." if not pilot["decision"].startswith("넓힌다")
                             else "대상을 넓힐 범위를 함께 정합니다."))
-        if low and n != "3":
+        if low and n != "3" and not cut:
             notes.append(f"성과가 낮았던 행사: {', '.join(i['name'] for i in low)}. 같은 혜택을 되풀이하지 않습니다.")
         cards.append({
             "pilot": int(n), "name": names.get(n, ""),

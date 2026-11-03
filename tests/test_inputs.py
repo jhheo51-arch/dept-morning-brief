@@ -508,3 +508,58 @@ def test_stale_block_is_marked(tmp_path):
     assert b["tasks"]["stale"] and b["tasks"]["stale_from"] == "2026-11-05"
     assert "## 업무 (2026-11-05 결과, 오늘 읽기 실패)" in (tmp_path / "output" / "site" / "brief.md").read_text(
         encoding="utf-8")
+
+
+# 낮음 고침과 다음 주 점검
+def test_partial_sales_file_stops_part_warnings(tmp_path):
+    rows = []
+    for w in range(4, 0, -1):
+        d = (TODAY - dt.timedelta(days=1 + 7 * w)).isoformat()
+        rows += [[d, "전체", "1000", "1000", "1000"], [d, "식품", "400", "400", "400"]]
+    d = (TODAY - dt.timedelta(days=1)).isoformat()
+    rows += [[d, "전체", "300", "1000", "1000"], [d, "식품", "100", "400", "400"]]
+    s = judge.rule_sales(sales_rows(tmp_path, rows), TODAY)
+    assert s["partial_pct"] == 30.0 and s["status"] == "확인 필요"
+    assert "집계가 덜 된 파일" in s["reasons"][0] and s["parts_flagged"] == []
+    w = judge.next_week_checks(TODAY, {"sales": s}, TODAY - dt.timedelta(days=7), TODAY - dt.timedelta(days=1))
+    assert w[0].startswith("매출 파일 다시 받기: 11/04")
+
+
+def test_archive_merges_when_only_due_changed(tmp_path):
+    real_mode(tmp_path)
+    inp = tmp_path / "inputs"
+    write_csv(inp, "tasks", ["업무", "기한", "상태"], [["결과 보고", "2026-11-01", "완료"]])
+    main.run(NOW, tmp_path, None, lambda d: {})
+    write_csv(inp, "tasks", ["업무", "기한", "상태"], [["결과 보고", "2026-11-03", "완료"]])
+    b = main.run(NOW + dt.timedelta(days=1), tmp_path, None, lambda d: {})
+    assert [(a["due"], a["done_on"]) for a in b["task_archive"]] == [("2026-11-03", "2026-11-05")]
+    # 매주 하는 같은 이름 업무는 따로 남는다
+    write_csv(inp, "tasks", ["업무", "기한", "상태"], [["결과 보고", "2026-11-10", "완료"]])
+    b = main.run(NOW + dt.timedelta(days=2), tmp_path, None, lambda d: {})
+    assert len(b["task_archive"]) == 2
+
+
+def test_weekly_dates_and_next_week_checks(tmp_path):
+    b = main.run(NOW, tmp_path, lambda now: ([], []), lambda d: {}, lambda j: None)
+    text = json.dumps(b["weekly"]["sections"], ensure_ascii=False)
+    assert not re.search(r"\b11-\d\d\b", text)
+    nxt = b["weekly"]["sections"][-1]
+    assert nxt["title"] == "다음 주 점검" and nxt["lines"]
+    assert any(x.startswith("11/09(월) ") for x in nxt["lines"])
+    assert all("vs" not in x and "·" not in x for x in nxt["lines"])
+
+
+def test_low_promo_left_out_of_last_day_copy(tmp_path):
+    b = main.run(NOW, tmp_path, lambda now: ([], []), lambda d: {}, lambda j: None)
+    low = {i["name"] for i in b["promo_results"]["items"] if i["flag"]}
+    for c in b["plan"]["cards"]:
+        assert not any(n in c["copy_a"] or n in c["copy_b"] for n in low if "마지막 날" in c["copy_a"])
+
+
+def test_unit_note_is_shown(tmp_path):
+    real_mode(tmp_path, '[sales]\nunit = "천원"\n')
+    write_csv(tmp_path / "inputs", "sales", ["날짜", "구분", "매출", "목표", "전년"],
+              [["2026-11-04", "전체", "1000", "1000", "1000"]])
+    b = main.run(NOW, tmp_path, None, lambda d: {})
+    if b["sales"].get("unit_note"):
+        assert "매출 단위" in (tmp_path / "output" / "site" / "brief.md").read_text(encoding="utf-8")
