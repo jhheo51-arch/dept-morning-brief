@@ -18,6 +18,9 @@ PROMOS = [  # 이름, 오늘 기준 시작, 끝, 장소, 매출 구분, 알릴 �
     ("문화센터 원데이 클래스 주간(가상)", 2, 8, "문화센터", "", "", "협의 중", "문화센터", 1.0),
     ("사은 행사(가상)", 5, 11, "고객센터 옆", "", "앱 푸시, 문자", "요청 전", "영업기획", 1.0),
 ]
+# 행사 기간 구분 매출 목표 = 기간 날마다 (구분 기준 매출 x 요일 배수 x 1.05)의 합 x 이 배수(가상)
+TARGETS = {"겨울 아우터 기획전(가상)": 1.25, "식품관 저녁 타임 혜택(가상)": 1.0, "리빙 브랜드 팝업(가상)": 0.95,
+           "가을 디저트 페어(가상)": 1.0}
 TASKS = [  # 업무, 오늘 기준 기한, 상태, 담당, 관련 행사, 오늘 기준 완료일(가상)
     ("사은 행사 VMD 요청서 보내기", -1, "", "영업기획", "사은 행사(가상)", None),
     ("문화센터 클래스 주간 알릴 길 정하기", 0, "진행 중", "문화센터", "문화센터 원데이 클래스 주간(가상)", None),
@@ -65,10 +68,15 @@ def make(folder, today, days=60):
             rows.append([d.isoformat(), name, round(sales, -4), round(target, -4), round(prev, -4)])
     _write(folder / "sales.csv", ["날짜", "구분", "매출", "목표", "전년"], rows)
 
+    def target(n, s, e, part):
+        if n not in TARGETS:
+            return ""
+        days = [today + dt.timedelta(days=k) for k in range(s, e + 1)]
+        return int(round(sum(PARTS[part] * DOW_MULT[d.weekday()] * 1.05 for d in days) * TARGETS[n], -6))
     _write(folder / "promotions.csv",
-           ["행사명", "시작일", "종료일", "장소", "매출 구분", "알릴 길", "VMD 상태", "담당", "메모"],
+           ["행사명", "시작일", "종료일", "장소", "매출 구분", "목표", "알릴 길", "VMD 상태", "담당", "메모"],
            [[n, (today + dt.timedelta(days=s)).isoformat(), (today + dt.timedelta(days=e)).isoformat(),
-             p, part, ch, v, o, "가상 행사"] for n, s, e, p, part, ch, v, o, _ in PROMOS])
+             p, part, target(n, s, e, part), ch, v, o, "가상 행사"] for n, s, e, p, part, ch, v, o, _ in PROMOS])
 
     touch = []
     for i in range(days, 0, -1):

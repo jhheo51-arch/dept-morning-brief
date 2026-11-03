@@ -253,6 +253,38 @@ def test_promo_results_against_same_weekdays_before(tmp_path):
     assert "견주지 않음" in by["나"]["note"] and not by["나"]["flag"]
 
 
+
+def test_promo_results_against_target(tmp_path):
+    # 식품은 매일 100원. 11/05 기준 어제까지 판단
+    days = [TODAY - dt.timedelta(days=k) for k in range(1, 40)]
+    sales = sales_rows(tmp_path, [[d.isoformat(), "식품", 100, "", ""] for d in days])
+    write_csv(tmp_path, "promotions", ["행사명", "시작일", "종료일", "매출 구분", "목표(천원)"], [
+        ["가", "2026-10-31", "2026-11-09", "식품", "1.2"],  # 5일 500원, 남은 5일, 이대로면 1000원으로 83.3%
+        ["나", "2026-11-03", "2026-11-09", "식품", "0.4"],  # 시작 2일째, 예상은 보이되 알리지 않음
+        ["다", "2026-10-25", "2026-10-30", "식품", "0.7"],  # 끝남, 600원으로 85.7%
+        ["라", "2026-10-25", "2026-10-30", "식품", ""],     # 목표 없음
+    ])
+    r = judge.rule_promo_results(I.read_table("promotions", tmp_path), sales, TODAY)
+    by = {i["name"]: i for i in r["items"]}
+    assert by["가"]["target"] == 1200 and by["가"]["target_pct"] == 41.7 and by["가"]["left_days"] == 5
+    assert by["가"]["forecast_pct"] == 83.3 and by["가"]["low_target"] and by["가"]["flag"]
+    assert not by["가"]["low_growth"]  # 앞 같은 요일 기간 대비로는 0%라 그것만으로는 알리지 않는다
+    assert by["나"]["forecast_note"].startswith("시작 2일째") and not by["나"]["flag"]
+    assert by["다"]["target_pct"] == 85.7 and by["다"]["low_target"] and by["다"]["left_days"] == 0
+    assert by["라"]["target"] is None and not by["라"]["flag"]
+    fact = judge.promo_fact(by["가"])
+    assert "목표" in fact and "남은 5일" in fact and "이대로면 83.3%" in fact
+    assert "목표" in r["rule_text"] and "가정값" in r["rule_text"]
+
+
+def test_sample_lead_decides_on_promo_target(tmp_path):
+    b = main.run(NOW, tmp_path, lambda now: ([], []), lambda d: {}, lambda j: None)
+    low = [i for i in b["promo_results"]["items"] if i.get("low_target")]
+    assert low and not b["failures"]
+    assert any("목표 대비" in d for d in b["lead"]["decide"])
+    weekly = (tmp_path / "docs" / "weekly.md").read_text(encoding="utf-8")
+    assert "목표" in weekly and "·" not in weekly
+
 # 접점 숫자
 def test_touch_numbers_flag_and_small_values(tmp_path):
     rows = []

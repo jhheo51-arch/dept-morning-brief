@@ -66,7 +66,10 @@ def top_three(out):
             usual.append(f"행사 진행 {promos['running']}건, 7일 안 시작 {promos['upcoming']}건, 경고 없음")
     if res and res["status"] == "확인 필요":
         i = next(i for i in res["items"] if i["flag"])
-        urgent.append(("행사 성과", f"행사 성과 {i['name']}: {i['part']} 매출 앞 같은 요일 기간 대비 {i['growth']:+}%"))
+        why = (f"목표 대비 이대로면 {i['forecast_pct']}%" if i.get("low_target") and i.get("forecast_pct") is not None
+               else f"목표의 {i['target_pct']}%로 끝남" if i.get("low_target")
+               else f"{i['part']} 매출 앞 같은 요일 기간 대비 {i['growth']:+}%")
+        urgent.append(("행사 성과", f"행사 성과 {i['name']}: {why}"))
     if touch and touch["flagged"]:
         t = touch["flagged"][0]
         more = f" 외 {len(touch['flagged']) - 1}건" if len(touch["flagged"]) > 1 else ""
@@ -105,7 +108,7 @@ def template_summary(out):
     if promos and promos["warn_count"]:
         s.append(f"행사 {len(promos['items'])}건 중 {promos['warn_count']}건에 경고가 있습니다.")
     if res and res["status"] == "확인 필요":
-        s.append(f"행사 성과는 {sum(i['flag'] for i in res['items'])}건이 앞 같은 요일 기간보다 낮습니다.")
+        s.append(f"행사 성과 {sum(i['flag'] for i in res['items'])}건이 낮습니다.")
     if touch and touch["flagged"]:
         s.append(f"접점 숫자 {len(touch['flagged'])}건이 평소와 다릅니다.")
     tasks = out.get("tasks")

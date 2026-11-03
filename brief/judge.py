@@ -315,6 +315,7 @@ def link_tasks(promos, tasks, archive):
 def rule_promo_results(promo_rows, sales_rows, today):
     """시작한 행사의 기간 매출(어제까지)을 바로 앞 같은 요일 기간과 견준다. 매출 구분이 있으면 그 구분만 본다."""
     keep, low = C.PROMO.get("result_days", 14), C.PROMO.get("result_low_pct", -5)
+    t_low, t_min = C.PROMO.get("target_low_pct", 95), C.PROMO.get("target_min_days", 3)
     total_name = C.SALES.get("total_name", "전체")
     by_day = sales_by_day(sales_rows, today)
     items = []
@@ -334,8 +335,9 @@ def rule_promo_results(promo_rows, sales_rows, today):
         now_v = [value(d) for d in days]
         base_v = [value(d) for d in base_days]
         prev_v = [value(d, "prev") for d in days]
+        target = I.to_num(r.get("목표"), r, "목표", required=False)
         item = {"name": str(r["행사명"] or "").strip(), "part": part, "start": s.isoformat(), "end": e.isoformat(),
-                "to": last.isoformat(), "days": len(days), "ended": e < today,
+                "to": last.isoformat(), "days": len(days), "ended": e < today, "target": target,
                 "base_from": base_days[0].isoformat(), "base_to": base_days[-1].isoformat(), "flag": False}
         if None in now_v or None in base_v:
             gap = [d.isoformat() for d, v in zip(days + base_days, now_v + base_v) if v is None]
@@ -344,17 +346,68 @@ def rule_promo_results(promo_rows, sales_rows, today):
             item.update(sales=sum(now_v), base=sum(base_v), sales_text=_won(sum(now_v)), base_text=_won(sum(base_v)),
                         growth=_growth(sum(now_v), sum(base_v)),
                         yoy=_growth(sum(now_v), sum(prev_v)) if None not in prev_v else None)
-            item["flag"] = item["growth"] is not None and item["growth"] <= low
+            item["low_growth"] = item["growth"] is not None and item["growth"] <= low
+            if target:
+                # 예상은 행사 전체 길이의 앞 같은 요일 기간에 지금까지의 배율을 곱해 요일 차이를 맞춘다
+                full = [s + dt.timedelta(days=i) for i in range((e - s).days + 1)]
+                f_shift = dt.timedelta(days=7 * math.ceil(len(full) / 7))
+                f_base = [value(d - f_shift) for d in full]
+                item.update(_promo_target(item, target, f_base, t_low, t_min))
+            item["flag"] = item["low_growth"] or item.get("low_target", False)
         items.append(item)
     items.sort(key=lambda x: (not x["flag"], x["start"]))
     return {
         "rule": "행사 성과",
         "items": items,
         "status": "확인 필요" if any(i["flag"] for i in items) else "평소",
-        "rule_text": f"행사 기간(어제까지) 매출을 바로 앞 같은 요일 기간과 견줌, {low}% 이하이면 확인 필요, "
-                     f"끝난 뒤 {keep}일까지 보여 줌. 앞 기간에 다른 행사가 있었으면 차이가 작게 나옴",
+        "rule_text": f"행사 기간(어제까지) 그 구분 전체 매출을 바로 앞 같은 요일 기간과 견줌, {low}% 이하이면 확인 필요, "
+                     f"끝난 뒤 {keep}일까지 보여 줌. 앞 기간에 다른 행사가 있었으면 차이가 작게 나옴. "
+                     f"행사 파일에 목표가 있으면 진행 중은 예상(남은 날의 앞 같은 요일 매출에 지금까지 배율을 곱해 더함, "
+                     f"시작 {t_min}일째부터), 끝난 행사는 실제 달성률이 목표의 {t_low}% 미만이면 확인 필요(가정값). "
+                     "매출은 행사만의 매출이 아니라 그 구분 전체 매출",
         "source": f"{_src(promo_rows[0]['_file'])}, {_src(sales_rows[0]['_file'])}" if promo_rows else "",
     }
+
+
+def _promo_target(item, target, f_base, t_low, t_min):
+    """행사 목표 대비. 진행 중이면 남은 날 예상과 남은 날 하루 필요 매출을 더한다.
+    예상 = 지금까지 매출 + 남은 날의 앞 같은 요일 매출 x (지금까지 매출 / 지금까지 날의 앞 같은 요일 매출)."""
+    got, n = item["sales"], item["days"]
+    left = len(f_base) - n
+    out = {"target_text": _won(target), "target_pct": round(got / target * 100, 1), "left_days": left,
+           "per_day_text": _won(got / n), "low_target": False}
+    if left <= 0:
+        out["low_target"] = out["target_pct"] < t_low
+        return out
+    out["need_per_day_text"] = _won(max(0, target - got) / left)
+    done = f_base[:n]
+    if None in f_base or not sum(done):
+        out["forecast_note"] = "앞 같은 요일 기간 매출이 없는 날이 있어 예상하지 않음"
+        return out
+    fc = got + sum(f_base[n:]) * got / sum(done)
+    out.update(forecast_text=_won(fc), forecast_pct=round(fc / target * 100, 1))
+    if n < t_min:
+        out["forecast_note"] = f"시작 {n}일째라 예상으로 알리지 않음"
+    else:
+        out["low_target"] = out["forecast_pct"] < t_low
+    return out
+
+
+def promo_fact(i, v=""):
+    """행사 성과 한 줄. 목표가 있으면 목표 대비를 앞에 둔다. 판단 결과의 숫자만 쓴다."""
+    if i.get("growth") is None:
+        return f"{i['name']}: {i.get('note', '견줄 자료 없음')}"
+    head = f"{i['name']}, {i['part']} 매출{v} {_md(i['start'])}~{_md(i['to'])}"
+    if i.get("target"):
+        if i["left_days"] > 0:
+            t = (f"목표 {i['target_text']} 중 {i['sales_text']}, {i['target_pct']}%. 남은 {i['left_days']}일 "
+                 f"하루 {i['need_per_day_text']} 필요, 지금까지 하루 {i['per_day_text']}"
+                 + (f", 이대로면 {i['forecast_pct']}%" if i.get("forecast_pct") is not None else "")
+                 + (f"({i['forecast_note']})" if i.get("forecast_note") else ""))
+        else:
+            t = f"목표 {i['target_text']} 중 {i['sales_text']}, {i['target_pct']}%로 끝남"
+        return f"{head}: {t}, 앞 같은 요일 기간 대비 {i['growth']:+}%"
+    return f"{head}: {i['sales_text']}, 앞 같은 요일 기간 대비 {i['growth']:+}%"
 
 
 # 문화센터, 라운지, 상담실 같은 접점의 하루 숫자
@@ -703,11 +756,7 @@ def week_summary(today, out, field_log=None, archive=None):
     if res and res["items"]:
         lines = []
         for i in res["items"]:
-            if i.get("growth") is None:
-                lines.append(f"{i['name']}: {i.get('note', '견줄 자료 없음')}")
-                continue
-            lines.append(f"{i['name']}({i['part']}, {_md(i['start'])}~{_md(i['to'])}): {i['sales_text']}, "
-                         f"앞 같은 요일 기간 대비 {i['growth']:+}%" + (", 확인 필요" if i["flag"] else ""))
+            lines.append(promo_fact(i) + (", 확인 필요" if i["flag"] else ""))
         sections.append({"title": "행사 성과", "lines": lines})
     promos = out.get("promos")
     if promos:
@@ -773,8 +822,8 @@ def next_week_checks(today, out, start, end):
                   if today.isoformat() <= i["start"] <= until.isoformat() and i["warns"] and not i.get("handled")]
     res = out.get("promo_results")
     if res:
-        lines += [f"결과 보고: {i['name']}, {_md(i['to'])} 끝" + (", 성과 낮음 원인 정리" if i["flag"] else "")
-                  for i in res["items"] if start.isoformat() <= i["to"] <= end.isoformat()]
+        lines += [f"결과 보고: {i['name']}, {_md(i['end'])} 끝" + (", 성과 낮음 원인 정리" if i["flag"] else "")
+                  for i in res["items"] if i["ended"] and start.isoformat() <= i["end"] <= end.isoformat()]
     repeat = []
     for c in C.WEEKLY.get("checks", []):
         day, _, what = str(c).partition(":")
@@ -821,8 +870,7 @@ def consult_drafts(today, out):
     res = out.get("promo_results")
     for i in (res or {}).get("items", []):
         if i["flag"]:
-            fact = (f"{i['name']}, {i['part']} 매출 {md(i['start'])}~{md(i['to'])}: {i['sales_text']}{v}, "
-                    f"앞 같은 요일 기간 대비 {i['growth']:+}%")
+            fact = promo_fact(i, v)
             add(vmd, fact, "진열 위치와 안내물을 바꿀 여지가 있는지 함께 보고 싶습니다. 원인은 아직 확인 전입니다.", i["name"])
             add(channel, fact, "알림 시간과 문구를 바꿀 여지가 있는지 함께 보고 싶습니다. 원인은 아직 확인 전입니다.", i["name"])
     sales = out.get("sales")
@@ -908,8 +956,10 @@ def lead_report(today, out):
                 if i["part"] != focus["part"] or (i["ended"] and (dt.date.fromisoformat(s["date"])
                                                                   - dt.date.fromisoformat(i["end"])).days > 7):
                     continue
-                causes.append(f"같은 구분 행사 {i['name']}: {md(i['start'])}~{md(i['to'])} {i['sales_text']}{v}, "
-                              f"앞 같은 요일 기간 대비 {i['growth']:+}%" + (f", {md(i['end'])} 끝남" if i["ended"] else ", 진행 중"))
+                if i.get("growth") is None:
+                    continue
+                causes.append("같은 구분 행사 " + promo_fact(i, v)
+                              + (f", {md(i['end'])} 끝남" if i["ended"] else ", 진행 중"))
             causes.append(f"전년 같은 날의 행사와 날씨는 이 도구에 없어 {focus['part']} 영업 담당에게 확인합니다")
 
     acts = []
@@ -938,7 +988,10 @@ def lead_report(today, out):
         decide.append(f"시범 {p['week_label']} 점검일입니다. 현재 판단은 {p['decision']}이라 계속할지 정해 주세요")
     for i in (out.get("promo_results") or {}).get("items", []):
         if i["flag"] and not i["ended"]:
-            decide.append(f"{i['name']}이 앞 같은 요일 기간 대비 {i['growth']:+}%라 진열이나 알림을 바꿀지 정해 주세요")
+            why = (f"목표 대비 이대로면 {i['forecast_pct']}%" if i.get("low_target")
+                   else f"앞 같은 요일 기간 대비 {i['growth']:+}%")
+            decide.append(f"{i['name']}이 {why}라 남은 {i['left_days']}일 진열이나 알림을 바꿀지 정해 주세요"
+                          if i.get("left_days") else f"{i['name']}이 {why}라 진열이나 알림을 바꿀지 정해 주세요")
     if not decide:
         decide = ["오늘 정해 주실 것은 없습니다"]
 

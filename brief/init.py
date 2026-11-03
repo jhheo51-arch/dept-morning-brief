@@ -42,6 +42,7 @@ repo_url = ""
 # [promotions]
 # result_days = 14          # 끝난 뒤 며칠까지 행사 성과를 보여 줄지
 # result_low_pct = -5       # 앞 같은 요일 기간 대비 이 % 이하이면 확인 필요(가정값)
+# target_low_pct = 95       # 행사 목표 대비 예상(진행 중) 또는 달성률(끝남)이 이 % 미만이면 확인 필요(가정값)
 
 # [touchpoint_daily]
 # change_pct = 30           # 평소(직전 4주 같은 요일 평균)보다 이 % 넘게 다르면 확인 필요
