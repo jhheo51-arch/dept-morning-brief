@@ -595,7 +595,7 @@ if(window.BRIEF&&!window.BRIEF.offline){var f=document.createElement('link');f.r
   if(Pr) chips.push(['행사', Pr.warn_count?'경고 '+Pr.warn_count+'건':'경고 없음', Pr.warn_count>0, 'promos']);
   if(Tk) chips.push(['업무', Tk.overdue+Tk.due_today?'지남 '+Tk.overdue+'건, 오늘 '+Tk.due_today+'건':'열린 업무 '+Tk.items.length+'건', Tk.overdue+Tk.due_today>0, 'tasks']);
   if(Tc) chips.push(['접점 숫자', Tc.flagged.length?'평소와 다름 '+Tc.flagged.length+'건':'평소', Tc.flagged.length>0, 'touch']);
-  if(r) chips.push(['앱 리뷰', r.status+', 새 1~2점 '+r.low_new+'건', r.status==='확인 필요', 'c41']);
+  if(r) chips.push(['앱 리뷰', r.status+', 1~2점 '+r.low_new+'건', r.status==='확인 필요', 'c41']);
   if(Cs) chips.push(['협의 메모', Cs.drafts.length?Cs.drafts.length+'명에게 보낼 것':'없음', false, 'consult']);
   if(p) chips.push(['시범', p.decision.split('(')[0], false, 'c43']);
   $('chips').innerHTML=chips.map(function(c){return '<button type="button" class="chip'+(c[2]?' warn':'')+'" data-go="'+c[3]+'"><div class="l">'+esc(c[0])+'</div><div class="x">'+esc(c[1])+'</div></button>'}).join('');
