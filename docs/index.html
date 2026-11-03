@@ -84,6 +84,43 @@ details.archive summary{cursor:pointer; font-weight:700; font-size:14px}
 .axis text{fill:var(--muted); font-size:10px}
 .legend{display:flex; gap:14px; font-size:12.5px; color:var(--ink2); margin:4px 0}
 .legend i{display:inline-block; width:10px; height:10px; border-radius:2px; vertical-align:middle; margin-right:5px}
+/* 탭과 한눈에 보기 */
+.tabs{position:sticky; top:0; z-index:5; display:flex; gap:4px; overflow-x:auto; background:var(--bg); padding:8px 0 10px; margin-bottom:6px; scrollbar-width:none}
+.tabs::-webkit-scrollbar{display:none}
+.tabs button{flex:0 0 auto; font:inherit; font-size:14px; font-weight:700; color:var(--ink2); background:var(--card); border:1px solid var(--line); border-radius:999px; padding:7px 14px; cursor:pointer}
+.tabs button[aria-selected="true"]{background:var(--green-d); border-color:var(--green-d); color:var(--card)}
+.tabs .n{display:inline-block; min-width:18px; margin-left:6px; padding:0 5px; border-radius:9px; font-size:11.5px; line-height:18px; text-align:center; background:var(--warm); color:var(--orange-d)}
+.panel[hidden]{display:none}
+.panel>section,.panel>.grid2{margin-bottom:16px}
+.chips{display:grid; grid-template-columns:repeat(auto-fit,minmax(130px,1fr)); gap:8px; margin:14px 0 4px}
+.chip{display:block; text-align:left; font:inherit; cursor:pointer; background:var(--bg); border:1px solid var(--line); border-left:4px solid var(--green); border-radius:8px; padding:8px 10px; color:var(--ink)}
+.chip.warn{border-left-color:var(--orange); background:var(--warm)}
+.chip .l{font-size:12px; color:var(--muted)} .chip .x{font-size:14.5px; font-weight:700; margin-top:1px}
+.chip.warn .x{color:var(--orange-d)}
+.headline ol a{color:inherit; text-decoration:none; border-bottom:1px dashed var(--muted)}
+.headline ol a:hover{color:var(--green-d)}
+.acts{display:flex; gap:8px; flex-wrap:wrap; margin-top:12px}
+.btn{font:inherit; font-size:13px; font-weight:600; border:1px solid var(--green-d); color:var(--green-d); background:var(--card); border-radius:6px; padding:5px 12px; cursor:pointer; text-decoration:none}
+.todo{list-style:none; margin:8px 0 0; padding:0}
+.todo li{display:flex; gap:10px; align-items:flex-start; padding:9px 2px; border-bottom:1px solid var(--line); font-size:14.5px}
+.todo input{width:18px; height:18px; margin-top:2px; accent-color:var(--green-d); flex:0 0 auto}
+.todo label{flex:1 1 auto; cursor:pointer}
+.todo .k{flex:0 0 auto; font-size:11.5px; font-weight:700; color:var(--muted); background:var(--bg); border-radius:4px; padding:1px 6px; margin-top:2px}
+.todo li.done span.t{color:var(--muted); text-decoration:line-through}
+.todo a{flex:0 0 auto; color:var(--green-d)}
+.prog{font-weight:700; color:var(--green-d)}
+details.src{font-size:12px; color:var(--muted); border-top:1px solid var(--line); margin-top:10px; padding-top:6px}
+details.src summary{cursor:pointer; list-style:none} details.src summary::-webkit-details-marker{display:none}
+details.src summary:before{content:"+ "} details.src[open] summary:before{content:"- "}
+details.src p{margin:4px 0 0}
+details.how{margin-top:6px; font-size:13px; color:var(--band-sub)} details.how summary{cursor:pointer}
+section{scroll-margin-top:64px}
+.flash{animation:flash 1.4s ease-out}
+@keyframes flash{0%{box-shadow:0 0 0 3px var(--orange)}100%{box-shadow:0 0 0 0 transparent}}
+@media print{
+  .tabs,.theme-btn,.acts,.copy,.more{display:none!important} .panel[hidden]{display:block!important}
+  body{background:#fff} .card,.headline{break-inside:avoid; border:1px solid #ddd} details.src{display:none}
+}
 footer{font-size:13px; color:var(--muted); text-align:center; margin-top:24px}
 @media (max-width:760px){
   .wrap{padding:16px 16px 48px} .grid2{grid-template-columns:1fr} .meta{text-align:left}
@@ -97,33 +134,45 @@ footer{font-size:13px; color:var(--muted); text-align:center; margin-top:24px}
     <div>
       <div class="brand" id="brand">백화점 마케팅 아침 점검</div>
       <h1 id="title">아침 점검</h1>
-      <div class="how" id="how"></div>
+      <details class="how"><summary>이 화면은 어떤 자료로 만드나요</summary><div id="how"></div></details>
     </div>
     <div class="meta"><div id="runat"></div><button class="theme-btn" id="theme">화면 밝기 바꾸기</button></div>
   </header>
   <div id="alerts"></div>
-  <section class="headline">
-    <div class="q">오늘 볼 것 세 가지</div>
-    <ol id="top3"></ol>
-    <p class="sum" id="summary"></p>
-    <div class="by" id="by"></div>
-  </section>
-  <section class="card" id="sales" style="margin-bottom:16px"></section>
-  <section class="card" id="promos" style="margin-bottom:16px"></section>
-  <section class="card" id="tasks" style="margin-bottom:16px"></section>
-  <section class="card" id="consult" style="margin-bottom:16px"></section>
-  <section class="card" id="c42" style="margin-bottom:16px"></section>
-  <section class="card" id="plan" style="margin-bottom:16px"></section>
-  <div class="grid2">
+  <nav class="tabs" id="tabs" role="tablist" aria-label="화면 나누기"></nav>
+  <div class="panel" data-tab="today">
+    <section class="headline">
+      <div class="q">오늘 볼 것 세 가지</div>
+      <ol id="top3"></ol>
+      <p class="sum" id="summary"></p>
+      <div class="by" id="by"></div>
+      <div class="chips" id="chips"></div>
+      <div class="acts"><button type="button" class="btn" id="sharecopy">아침 공유 글 복사</button><a class="btn" href="brief.md">brief.md 받기</a><button type="button" class="btn" id="printbtn">인쇄</button></div>
+    </section>
+    <section class="card" id="todo"></section>
     <section class="card" id="c44"></section>
-    <section class="card" id="touch"></section>
   </div>
-  <section class="card" id="weekly" style="margin-bottom:16px"></section>
-  <div class="grid2">
-    <section class="card" id="c41"></section>
+  <div class="panel" data-tab="numbers">
+    <section class="card" id="sales"></section>
+    <div class="grid2">
+      <section class="card" id="touch"></section>
+      <section class="card" id="c41"></section>
+    </div>
+    <section class="card" id="hist"></section>
+  </div>
+  <div class="panel" data-tab="work">
+    <section class="card" id="promos"></section>
+    <section class="card" id="tasks"></section>
+    <section class="card" id="c42"></section>
+  </div>
+  <div class="panel" data-tab="plan">
+    <section class="card" id="consult"></section>
+    <section class="card" id="plan"></section>
     <section class="card" id="c43"></section>
   </div>
-  <section class="card" id="hist"></section>
+  <div class="panel" data-tab="week">
+    <section class="card" id="weekly"></section>
+  </div>
   <footer id="foot"></footer>
 </div>
 <script src="data.js"></script>
@@ -164,7 +213,14 @@ if(window.BRIEF&&!window.BRIEF.offline){var f=document.createElement('link');f.r
   $('top3').innerHTML=(B.top3||[]).map(function(t){return '<li>'+esc(t)+'</li>'}).join('');
   $('summary').textContent=B.summary||'';
   $('by').textContent='요약: '+(B.summary_by||'');
-  function src(rule,s){return '<div class="src">규칙 '+esc(rule)+' | 출처 '+esc(s)+'</div>'}
+  function src(rule,s){return '<details class="src"><summary>판단 기준과 출처</summary><p>규칙 '+esc(rule)+'</p><p>출처 '+esc(s)+'</p></details>'}
+  // 복사 단추. 글은 CP에 모아 두고 번호로 꺼낸다
+  var CP=[];
+  function cbtn(text,label){CP.push(text); return '<button type="button" class="copy" data-cp="'+(CP.length-1)+'">'+(label||'복사')+'</button>'}
+  function copyText(t,b){
+    var done=function(){b.textContent='복사됨'}, fail=function(){b.textContent='복사 안 됨'};
+    if(navigator.clipboard) navigator.clipboard.writeText(t).then(done,fail); else fail();
+  }
   function pct(n){return n==null?'-':(n>0?'+':'')+n+'%'}
   function failed(what){
     return '<div class="empty">'+esc(what)+' 파일을 읽지 못했습니다. '+((B.failures||[]).length?'위 실패 안내의 행 번호와 열 이름을 고쳐 주세요.':'실행할 때 명령 창에 나온 안내를 확인해 주세요.')+'</div>';
@@ -277,7 +333,8 @@ if(window.BRIEF&&!window.BRIEF.offline){var f=document.createElement('link');f.r
   // 주간 정리
   var Wk=B.weekly; h='<h3>주간 정리'+VT+'</h3>';
   if(Wk){
-    h+='<div class="sub">'+esc(Wk.from)+' ~ '+esc(Wk.to)+', 주간 보고 초안. <a href="weekly.md">weekly.md 받기</a></div>';
+    var wt='주간 정리('+Wk.from.slice(5).replace('-','/')+'~'+Wk.to.slice(5).replace('-','/')+')\n'+Wk.sections.map(function(s){return '\n['+s.title+']\n'+s.lines.map(function(x){return '- '+x}).join('\n')}).join('\n');
+    h+='<div class="sub">'+esc(Wk.from)+' ~ '+esc(Wk.to)+', 주간 보고 초안. <a href="weekly.md">weekly.md 받기</a>'+cbtn(wt,'전체 복사')+'</div>';
     h+=Wk.sections.map(function(s){return '<p style="margin:8px 0 2px;font-weight:700">'+esc(s.title)+'</p><ul class="plain">'+s.lines.map(function(x){return '<li>'+esc(x)+'</li>'}).join('')+'</ul>'}).join('');
     h+=src('주간 정리', Wk.source);
   } else h+='<div class="empty">주간 정리를 만들지 못했습니다.</div>';
@@ -290,19 +347,11 @@ if(window.BRIEF&&!window.BRIEF.offline){var f=document.createElement('link');f.r
     if(Cs.drafts.length){
       h+=Cs.drafts.map(function(d,n){
         return '<details class="draft"'+(n===0?' open':'')+'><summary>'+esc(d.to)+' <span class="sub">'+d.count+'건</span>'
-          +'<button class="copy" data-n="'+n+'">복사</button></summary><p class="memo">'+esc(d.text)+'</p></details>'}).join('');
+          +cbtn(d.text)+'</summary><p class="memo">'+esc(d.text)+'</p></details>'}).join('');
     } else h+='<div class="empty">오늘은 협의할 확인 필요 항목이 없습니다.</div>';
     h+=src(Cs.rule_text, Cs.source);
   } else h+='</div><div class="empty">협의 초안을 만들지 못했습니다.</div>';
   $('consult').innerHTML=h;
-  Array.prototype.forEach.call(document.querySelectorAll('#consult .copy'),function(b){
-    b.addEventListener('click',function(e){
-      e.preventDefault();
-      var t=Cs.drafts[+b.getAttribute('data-n')].text;
-      if(navigator.clipboard) navigator.clipboard.writeText(t).then(function(){b.textContent='복사됨'},function(){b.textContent='복사 안 됨'});
-      else b.textContent='복사 안 됨';
-    });
-  });
 
   // 4.1
   var r=B.review; h='<h3>고객 접점 알림'+OLD(r)+'</h3>';
@@ -366,7 +415,7 @@ if(window.BRIEF&&!window.BRIEF.offline){var f=document.createElement('link');f.r
           +'<dt>누구에게</dt><dd>'+esc(c.target)+'</dd>'
           +'<dt>무엇을</dt><dd>'+esc(c.benefit)+'</dd>'
           +'<dt>알릴 길</dt><dd>'+esc(c.channels.join(', '))+'</dd>'
-          +'<dt>문구 A</dt><dd>'+esc(c.copy_a)+'</dd><dt>문구 B</dt><dd>'+esc(c.copy_b)+'</dd>'
+          +'<dt>문구 A</dt><dd>'+esc(c.copy_a)+cbtn(c.copy_a)+'</dd><dt>문구 B</dt><dd>'+esc(c.copy_b)+cbtn(c.copy_b)+'</dd>'
           +'<dt>재는 법</dt><dd>'+esc(c.measure)+'</dd><dt>맡을 곳</dt><dd>'+esc(c.owner)+'</dd></dl>'
           +c.notes.map(function(x){return '<div class="note">'+esc(x)+'</div>'}).join('')+'</div>'}).join('')+'</div>';
     } else h+='<div class="empty">이번 주 달력에 맞춰 볼 시범이 없습니다.</div>';
@@ -418,6 +467,74 @@ if(window.BRIEF&&!window.BRIEF.offline){var f=document.createElement('link');f.r
   }
   h+=src('4.1과 같은 단어 규칙, 실행 기록은 history 폴더(날짜별 집계만)', r?'Google Play 공개 리뷰, 원문 없이 건수만':'실행 기록');
   $('hist').innerHTML=h;
+
+  // 오늘 볼 것을 해당 칸으로 잇는다
+  function target(t){
+    var m=[[/^업무/,'tasks'],[/^매출/,'sales'],[/^행사/,'promos'],[/^접점/,'touch'],[/^앱 리뷰/,'c41'],[/^오늘\(/,'c42']];
+    for(var i=0;i<m.length;i++) if(m[i][0].test(t)) return m[i][1];
+    return '';
+  }
+  $('top3').innerHTML=(B.top3||[]).map(function(t){var g=target(t); return '<li>'+(g?'<a href="#'+g+'" data-go="'+g+'">'+esc(t)+'</a>':esc(t))+'</li>'}).join('');
+
+  // 오늘 할 일. 체크는 이 브라우저에만 날짜별로 남는다
+  var todo=[];
+  (B.top3||[]).forEach(function(t){ if(!/^(그 밖에|업무)/.test(t)) todo.push(['확인',t,target(t)]); });
+  ((Tk&&!Tk.stale&&Tk.items)||[]).forEach(function(i){ if(i.left!=null&&i.left<=0) todo.push(['업무',i.name+' ('+i.phase+')','tasks']); });
+  ((f&&f.items)||[]).forEach(function(i){ todo.push(['현장',i.place+': '+i.check,'c44']); });
+  if(Cs&&Cs.drafts.length) todo.push(['협의',Cs.drafts.length+'명에게 협의 메모 보내기('+Cs.drafts.map(function(d){return d.to.replace(/ 담당$/,'')}).join(', ')+')','consult']);
+  var seen={}; todo=todo.filter(function(x){if(seen[x[1]]) return false; seen[x[1]]=1; return true});
+  var KEY='todo-'+B.date, done={};
+  try{done=JSON.parse(localStorage.getItem(KEY)||'{}')||{}}catch(e){}
+  function prog(){return todo.filter(function(x){return done[x[1]]}).length+' / '+todo.length+' 끝냄'}
+  h='<h3>오늘 할 일</h3><div class="sub">오늘 볼 것, 오늘까지인 업무, 현장 점검, 보낼 협의 메모를 모았습니다. 체크는 이 PC 브라우저에만 남습니다. <span class="prog" id="prog">'+prog()+'</span></div>';
+  h+=todo.length?'<ul class="todo">'+todo.map(function(x,n){
+    return '<li'+(done[x[1]]?' class="done"':'')+'><input type="checkbox" id="td'+n+'"'+(done[x[1]]?' checked':'')+'><span class="k">'+esc(x[0])+'</span><label for="td'+n+'"><span class="t">'+esc(x[1])+'</span></label>'
+      +(x[2]?'<a href="#'+x[2]+'" data-go="'+x[2]+'" class="sub">보기</a>':'')+'</li>'}).join('')+'</ul>':'<div class="empty">오늘 따로 챙길 일이 없습니다.</div>';
+  $('todo').innerHTML=h;
+  document.querySelectorAll('.todo input').forEach(function(c){
+    c.onchange=function(){var t=todo[+c.id.slice(2)][1]; if(c.checked) done[t]=1; else delete done[t];
+      c.parentNode.className=c.checked?'done':''; try{localStorage.setItem(KEY,JSON.stringify(done))}catch(e){} $('prog').textContent=prog();};
+  });
+
+  // 한눈에 보기
+  var chips=[];
+  if(S) chips.push(['매출', S.partial_pct!=null?'파일 다시 받기':(S.parts_flagged||[]).length?'구분 확인: '+S.parts_flagged.join(', '):S.status+(S.total.yoy_pct!=null?', 전년 '+pct(S.total.yoy_pct):''), S.status==='확인 필요'||(S.parts_flagged||[]).length>0, 'sales']);
+  if(Pr) chips.push(['행사', Pr.warn_count?'경고 '+Pr.warn_count+'건':'경고 없음', Pr.warn_count>0, 'promos']);
+  if(Tk) chips.push(['업무', Tk.overdue+Tk.due_today?'지남 '+Tk.overdue+'건, 오늘 '+Tk.due_today+'건':'열린 업무 '+Tk.items.length+'건', Tk.overdue+Tk.due_today>0, 'tasks']);
+  if(Tc) chips.push(['접점 숫자', Tc.flagged.length?'평소와 다름 '+Tc.flagged.length+'건':'평소', Tc.flagged.length>0, 'touch']);
+  if(r) chips.push(['앱 리뷰', r.status+', 새 1~2점 '+r.low_new+'건', r.status==='확인 필요', 'c41']);
+  if(Cs) chips.push(['협의 메모', Cs.drafts.length?Cs.drafts.length+'명에게 보낼 것':'없음', false, 'consult']);
+  if(p) chips.push(['시범', p.decision.split('(')[0], false, 'c43']);
+  $('chips').innerHTML=chips.map(function(c){return '<button type="button" class="chip'+(c[2]?' warn':'')+'" data-go="'+c[3]+'"><div class="l">'+esc(c[0])+'</div><div class="x">'+esc(c[1])+'</div></button>'}).join('');
+
+  // 탭. 숫자는 그 탭에서 확인이 필요한 건수
+  var TABS=[['today','오늘'],['numbers','숫자'],['work','행사와 업무'],['plan','협의와 기획'],['week','주간 보고']];
+  var warnN={numbers:(S&&(S.status==='확인 필요'||(S.parts_flagged||[]).length)?1:0)+(Tc?Tc.flagged.length:0)+(r&&r.status==='확인 필요'?1:0),
+    work:(Pr?Pr.warn_count:0)+(Tk?Tk.overdue+Tk.due_today:0), plan:Cs?Cs.drafts.length:0};
+  $('tabs').innerHTML=TABS.map(function(t){return '<button type="button" role="tab" data-t="'+t[0]+'">'+t[1]+(warnN[t[0]]?'<span class="n">'+warnN[t[0]]+'</span>':'')+'</button>'}).join('');
+  function show(t){
+    if(!TABS.some(function(x){return x[0]===t})) t='today';
+    document.querySelectorAll('.panel').forEach(function(x){x.hidden=x.getAttribute('data-tab')!==t});
+    document.querySelectorAll('#tabs button').forEach(function(b){b.setAttribute('aria-selected',b.getAttribute('data-t')===t)});
+    try{localStorage.setItem('tab',t)}catch(e){}
+  }
+  function go(id){
+    var el=$(id); if(!el) return;
+    show(el.closest('.panel').getAttribute('data-tab'));
+    el.scrollIntoView({behavior:'smooth',block:'start'}); el.classList.remove('flash'); void el.offsetWidth; el.classList.add('flash');
+  }
+  document.addEventListener('click',function(e){
+    var t=e.target.closest('[data-t]'); if(t){show(t.getAttribute('data-t')); window.scrollTo({top:0}); return;}
+    var g=e.target.closest('[data-go]'); if(g){e.preventDefault(); go(g.getAttribute('data-go')); return;}
+    var c=e.target.closest('[data-cp]'); if(c){e.preventDefault(); copyText(CP[+c.getAttribute('data-cp')],c);}
+  });
+  var first='today'; try{first=localStorage.getItem('tab')||'today'}catch(e){}
+  show(first);
+
+  // 아침 공유 글. 메신저에 붙여 넣기 좋은 짧은 글
+  var share=$('title').textContent+'\n'+(B.top3||[]).map(function(t,i){return (i+1)+'. '+t}).join('\n')+'\n\n'+(B.summary||'');
+  $('sharecopy').onclick=function(){copyText(share,this)};
+  $('printbtn').onclick=function(){window.print()};
 })();
 </script>
 </body>
