@@ -208,7 +208,13 @@ def test_webhook_payload(monkeypatch):
     assert notify.send(b, opener) is False and sent == []
     monkeypatch.setenv("BRIEF_WEBHOOK_URL", "https://hooks.example.test/x")
     assert notify.send(b, opener) is True
-    assert sent[0] == {"text": "[아침 점검 2026-11-05] 내 점포\n1. 가\n2. 나"}
+    assert sent[0] == {"text": "[아침 점검 2026-11-05] 내 점포\n1. 가\n2. 나\n대시보드: " + C.DASHBOARD_URL}
+    # 팀장 보고 헤드라인과 메시지, 푸시 문안은 채널에 올리기만 하고 고객에게 보내지 않는다고 적는다
+    b2 = dict(b, lead={"headline": "매출 확인 필요"},
+              plan={"cards": [{"when": "11/6(목) 18시", "name": "퇴근길 식품관", "copy_a": "문안 A"}]})
+    text = notify.message(b2)
+    assert "팀장 보고: 매출 확인 필요" in text and "자동 발송하지 않음" in text
+    assert "11/6(목) 18시 퇴근길 식품관: 문안 A" in text
     monkeypatch.setattr(C, "OFFLINE", True)  # offline이면 주소가 있어도 보내지 않는다
     assert notify.send(b, opener) is False and len(sent) == 1
 
@@ -252,6 +258,28 @@ def test_promo_results_against_same_weekdays_before(tmp_path):
     assert by["가"]["base_from"] == "2026-10-26" and by["가"]["base_to"] == "2026-10-28" and by["가"]["to"] == "2026-11-04"
     assert by["가"]["growth"] == -20.0 and by["가"]["flag"] and r["status"] == "확인 필요"
     assert "견주지 않음" in by["나"]["note"] and not by["나"]["flag"]
+
+
+def test_promo_lean_compares_other_parts(tmp_path):
+    # 식품, 패션은 행사 기간(11/02~) 매출이 오르고, 리빙은 그대로. 전체 줄 없음(구분을 더함)
+    days = [TODAY - dt.timedelta(days=k) for k in range(1, 20)]
+    up = lambda d, a, b: a if d >= dt.date(2026, 11, 2) else b  # noqa: E731
+    rows = []
+    for d in days:
+        rows += [[d.isoformat(), "식품", up(d, 120, 100), "", ""], [d.isoformat(), "패션", up(d, 101, 100), "", ""],
+                 [d.isoformat(), "리빙", 100, "", ""]]
+    sales = sales_rows(tmp_path, rows)
+    write_csv(tmp_path, "promotions", ["행사명", "시작일", "종료일", "매출 구분"], [
+        ["가", "2026-11-02", "2026-11-08", "식품"],   # +20% 대 다른 구분 +0.5%, 차이 +19.5%p
+        ["나", "2026-11-02", "2026-11-08", "패션"],   # +1% 대 다른 구분 +10%, 차이 -9%p
+        ["다", "2026-11-04", "2026-11-08", "식품"],   # 시작 1일째
+    ])
+    r = judge.rule_promo_results(I.read_table("promotions", tmp_path), sales, TODAY)
+    by = {i["name"]: i for i in r["items"]}
+    assert by["가"]["gap_pp"] == 19.5 and by["가"]["lean"] == "이어 가기 검토"
+    assert by["나"]["gap_pp"] == -9.0 and by["나"]["lean"] == "멈춤 검토"
+    assert by["다"]["lean"] == "판단 보류"
+    assert "단정하지 않" in r["caution"] and "남겨 둔 회원" in r["caution"]
 
 
 
@@ -710,10 +738,13 @@ def test_sources_reads_newest_file_from_bi_folder(tmp_path, monkeypatch):
 def test_minimal_setup_without_sales(tmp_path):
     """사내 BI가 있을 때 최소 구성: 매출 파일 없이 행사, 업무, 현장 기록만으로도 화면과 팀장 보고가 만들어진다."""
     import shutil
+    from brief import samples
     real_mode(tmp_path)
     (tmp_path / "inputs").mkdir()
+    # samples/ 는 .gitignore 라 CI에는 없으므로 여기서 새로 만든다
+    samples.make(tmp_path / "samples", dt.date(2026, 11, 3))
     for name in ("promotions", "tasks", "field_log"):
-        shutil.copyfile(C.ROOT / "samples" / f"{name}.csv", tmp_path / "inputs" / f"{name}.csv")
+        shutil.copyfile(tmp_path / "samples" / f"{name}.csv", tmp_path / "inputs" / f"{name}.csv")
     b = main.run(dt.datetime(2026, 11, 3, 7, 0, tzinfo=KST), tmp_path, None, lambda d: {})
     assert b["sales"] is None and b["promo_results"] is None and "sales.xlsx" in b["missing"]
     assert b["promos"]["items"] and b["tasks"]["items"] and not b["failures"]

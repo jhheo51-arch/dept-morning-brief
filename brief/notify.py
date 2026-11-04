@@ -8,9 +8,19 @@ from . import rules_config as C
 
 def message(b):
     lines = [f"[아침 점검 {b['date']}] {b.get('store_name', '')}".rstrip()]
+    head = (b.get("lead") or {}).get("headline")
+    if head:
+        lines.append(f"팀장 보고: {head}")
     lines += [f"{i}. {t}" for i, t in enumerate(b["top3"], 1)]
+    # 고객 메시지와 푸시는 문안만 채널에 올린다. 고객에게 보내는 것은 담당자가 발송 도구에서 한다
+    cards = (b.get("plan") or {}).get("cards", [])
+    if cards:
+        lines += ["", "고객 메시지와 푸시 문안(검토용, 고객에게 자동 발송하지 않음)"]
+        lines += [f"- {c['when']} {c['name']}: {c['copy_a']}" for c in cards]
     if b["failures"]:
         lines.append("실패: " + ", ".join(f["step"] for f in b["failures"]))
+    if C.DASHBOARD_URL:
+        lines.append(f"대시보드: {C.DASHBOARD_URL}")
     return "\n".join(lines)
 
 

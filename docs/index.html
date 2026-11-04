@@ -299,7 +299,7 @@ if(window.BRIEF&&!window.BRIEF.offline){var f=document.createElement('link');f.r
   var R=B.promo_results;
   if(R&&R.items.length){
     h+='<h3 style="margin-top:16px">행사 성과'+VT+'</h3><div class="sub">행사 기간의 그 구분 전체 매출(행사만의 매출이 아님)을 목표와 바로 앞 같은 요일 기간에 견줌<span class="tag '+(R.status==='확인 필요'?'warn':'ok')+'">'+esc(R.status)+'</span></div>';
-    h+='<div class="scroll"><table class="tbl"><tr><th>행사</th><th class="r">구분 매출</th><th class="r">목표 대비</th><th class="r">앞 기간 대비</th></tr>'+R.items.map(function(i){
+    h+='<div class="scroll"><table class="tbl"><tr><th>행사</th><th class="r">구분 매출</th><th class="r">목표 대비</th><th class="r">앞 기간 대비</th><th>판단 기울기</th></tr>'+R.items.map(function(i){
       var md=function(x){return esc(x.slice(5).replace('-','/'))};
       var tg='-';
       if(i.target){
@@ -311,7 +311,9 @@ if(window.BRIEF&&!window.BRIEF.offline){var f=document.createElement('link');f.r
       } else if(!i.note) tg='<span class="sub">행사 파일에 목표 없음</span>';
       return '<tr><td><b>'+esc(i.name)+'</b><br><span class="sub">'+esc(i.part||'전체')+', '+md(i.start)+'~'+md(i.to)+(i.ended?' 종료':' 진행 중')+'</span></td>'
         +'<td class="r">'+(esc(i.sales_text)||'-')+(i.per_day_text?'<br><span class="sub">하루 '+esc(i.per_day_text)+'</span>':'')+'</td><td class="r">'+tg+'</td>'
-        +'<td class="r'+(i.low_growth?' bad':'')+'">'+(i.note?esc(i.note):pct(i.growth)+'<br><span class="sub">'+esc(i.base_text)+', '+md(i.base_from)+'~'+md(i.base_to)+'</span>')+'</td></tr>'}).join('')+'</table></div>';
+        +'<td class="r'+(i.low_growth?' bad':'')+'">'+(i.note?esc(i.note):pct(i.growth)+'<br><span class="sub">'+esc(i.base_text)+', '+md(i.base_from)+'~'+md(i.base_to)+'</span>')+'</td>'
+        +'<td>'+(i.lean?'<b>'+esc(i.lean)+'</b><br><span class="sub">'+esc(i.lean_why)+'</span>':'-')+'</td></tr>'}).join('')+'</table></div>';
+    if(R.caution) h+='<div class="sub" style="margin-top:6px">'+esc(R.caution)+'</div>';
     h+=src(R.rule_text, R.source);
   }
   $('promos').innerHTML=h;

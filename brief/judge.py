@@ -334,6 +334,7 @@ def rule_promo_results(promo_rows, sales_rows, today):
     """시작한 행사의 기간 매출(어제까지)을 바로 앞 같은 요일 기간과 견준다. 매출 구분이 있으면 그 구분만 본다."""
     keep, low = C.PROMO.get("result_days", 14), C.PROMO.get("result_low_pct", -5)
     t_low, t_min = C.PROMO.get("target_low_pct", 95), C.PROMO.get("target_min_days", 3)
+    gap = C.PROMO.get("lean_gap_pp", 3)
     total_name = C.SALES.get("total_name", "전체")
     by_day = sales_by_day(sales_rows, today)
     items = []
@@ -372,6 +373,14 @@ def rule_promo_results(promo_rows, sales_rows, today):
                 f_base = [value(d - f_shift) for d in full]
                 item.update(_promo_target(item, target, f_base, t_low, t_min))
             item["flag"] = item["low_growth"] or item.get("low_target", False)
+            if part != total_name:
+                # 같은 날 다른 구분(전체에서 이 구분을 뺀 것)도 같이 올랐으면 행사보다 날씨나 시즌 덕일 수 있다
+                rest = [_rest(by_day, d, part) for d in days + base_days]
+                if None not in rest:
+                    item["rest_growth"] = _growth(sum(rest[:len(days)]), sum(rest[len(days):]))
+                    if item["growth"] is not None and item["rest_growth"] is not None:
+                        item["gap_pp"] = round(item["growth"] - item["rest_growth"], 1)
+            item.update(_promo_lean(item, total_name, t_min, gap))
         items.append(item)
     items.sort(key=lambda x: (not x["flag"], x["start"]))
     return {
@@ -382,9 +391,38 @@ def rule_promo_results(promo_rows, sales_rows, today):
                      f"끝난 뒤 {keep}일까지 보여 줌. 앞 기간에 다른 행사가 있었으면 차이가 작게 나옴. "
                      f"행사 파일에 목표가 있으면 진행 중은 예상(남은 날의 앞 같은 요일 매출에 지금까지 배율을 곱해 더함, "
                      f"시작 {t_min}일째부터), 끝난 행사는 실제 달성률이 목표의 {t_low}% 미만이면 확인 필요(가정값). "
-                     "매출은 행사만의 매출이 아니라 그 구분 전체 매출",
+                     "매출은 행사만의 매출이 아니라 그 구분 전체 매출. "
+                     f"판단 기울기는 같은 기간 다른 구분 증가율과의 차이가 +{gap}%p 이상이면 이어 가기 검토, "
+                     f"-{gap}%p 이하이거나 목표에 못 미치면 멈춤 검토, 그 사이면 고쳐서 다시 검토(기준은 가정값). "
+                     "행사 효과로 단정하지 않음",
+        "caution": "행사 효과로 단정하지 않습니다. 확정하려면 혜택을 보내지 않고 남겨 둔 회원이나 행사가 없는 점포와 견줘야 합니다.",
         "source": f"{_src(promo_rows[0]['_file'])}, {_src(sales_rows[0]['_file'])}" if promo_rows else "",
     }
+
+
+def _rest(by_day, d, part):
+    """그날 전체 매출에서 이 구분을 뺀 값. 둘 중 하나라도 없으면 None."""
+    t, p = total_of(by_day, d), by_day.get(d, {}).get(part)
+    return t["sales"] - p["sales"] if t and p and t["sales"] is not None else None
+
+
+def _promo_lean(item, total_name, t_min, gap):
+    """결정을 돕는 기울기 하나와 이유. 정하는 것은 사람이고, 행사 효과를 확정하지 않는다."""
+    if item["days"] < t_min:
+        return {"lean": "판단 보류", "lean_why": f"시작 {item['days']}일째라 판단하기 이른 시점"}
+    if item["part"] == total_name:
+        return {"lean": "판단 보류", "lean_why": "전체 매출이라 견줄 다른 구분이 없음"}
+    g = item.get("gap_pp")
+    if g is None:
+        return {"lean": "판단 보류", "lean_why": "같은 기간 다른 구분 매출이 없어 견주지 못함"}
+    why = f"다른 구분보다 {g:+}%p"
+    if item.get("low_target"):
+        return {"lean": "멈춤 검토" if item["ended"] else "고쳐서 다시 검토", "lean_why": why + ", 목표에 못 미침"}
+    if g >= gap:
+        return {"lean": "이어 가기 검토", "lean_why": why}
+    if g <= -gap:
+        return {"lean": "멈춤 검토", "lean_why": why}
+    return {"lean": "고쳐서 다시 검토", "lean_why": why + ", 차이가 작아 행사 덕인지 알 수 없음"}
 
 
 def _promo_target(item, target, f_base, t_low, t_min):

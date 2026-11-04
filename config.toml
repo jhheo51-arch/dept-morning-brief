@@ -13,6 +13,8 @@ store_name = "여의도 플래그십(가상)"
 # 회사 PC에서 외부 접속이 막혀 있거나 IT 승인 전이면 켭니다.
 # 알림 웹훅 주소를 담은 환경변수 이름(Slack, Teams 수신 웹훅). 비어 있으면 보내지 않습니다.
 webhook_env = "BRIEF_WEBHOOK_URL"
+# 알림 끝에 붙일 대시보드 주소. real 모드는 사내에서 여는 output/site 주소를 config.local.toml 에 적습니다.
+dashboard_url = "https://jhheo51-arch.github.io/dept-morning-brief/"
 # 화면 맨 아래 저장소 링크. 비우면 표시하지 않습니다.
 repo_url = "https://github.com/jhheo51-arch/dept-morning-brief"
 
@@ -97,6 +99,9 @@ result_low_pct = -5       # 직전 같은 요일 기간 대비 이 % 이하이�
 # 예상은 남은 날의 앞 같은 요일 매출에 지금까지의 배율(행사 기간 매출 / 앞 같은 요일 매출)을 곱해 더한 값입니다
 target_low_pct = 95       # (가정값)
 target_min_days = 3       # 시작 며칠째부터 예상으로 알릴지. 그 전에는 숫자만 보여 줌
+# 판단 기울기: 행사 구분 증가율에서 같은 기간 다른 구분 증가율을 뺀 차이가 이 %p 이상이면 이어 가기 검토,
+# 마이너스 이 값 이하면 멈춤 검토, 그 사이면 고쳐서 다시 검토. 행사 효과를 확정하는 값이 아닙니다
+lean_gap_pp = 3           # (가정값)
 
 [touchpoint_daily]
 # 문화센터, 라운지, 상담실 같은 접점의 하루 숫자(inputs/touchpoint_daily)

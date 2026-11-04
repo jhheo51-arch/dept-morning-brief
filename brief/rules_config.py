@@ -62,6 +62,7 @@ def load(paths=None):
     g["OFFLINE"] = run.get("offline", False)
     g["WEBHOOK_ENV"] = run.get("webhook_env", "")
     g["REPO_URL"] = run.get("repo_url", "")
+    g["DASHBOARD_URL"] = run.get("dashboard_url", "")
     # 시연은 docs/ 와 data/ 에 쓰고(공개), 내 데이터는 output/ 에만 쓴다(.gitignore)
     g["INPUT_DIR"] = ROOT / ("samples" if SAMPLE else run.get("input_dir", "inputs"))
     g["SITE_DIR"] = ROOT / ("docs" if SAMPLE else run.get("output_dir", "output") + "/site")

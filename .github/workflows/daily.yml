@@ -28,6 +28,8 @@ jobs:
         id: run
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          # Slack 수신 웹훅 주소. 저장소 Secrets에 없으면 빈 값이라 알림만 건너뛴다
+          BRIEF_WEBHOOK_URL: ${{ secrets.BRIEF_WEBHOOK_URL }}
           TZ: Asia/Seoul
         run: |
           set +e

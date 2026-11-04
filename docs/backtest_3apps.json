@@ -1,0 +1,1040 @@
+{
+ "note": "3사 앱 Google Play 공개 리뷰로 4.1 규칙을 매일 7시 실행했다고 보고 다시 계산. 원문, 작성자, 리뷰 ID 없음",
+ "rule_text": "막힘 1건 이상 또는 새 1~2점이 4주 평균의 2배 초과",
+ "days_per_app": 703,
+ "apps": {
+  "현대": {
+   "app_id": "com.ehyundai.mcard",
+   "reviews": 738,
+   "low_reviews": 77,
+   "flagged_days": 59,
+   "flagged_by_blocked": 21,
+   "flagged": [
+    {
+     "date": "2024-12-02",
+     "low_new": 1,
+     "blocked_new": 0
+    },
+    {
+     "date": "2024-12-09",
+     "low_new": 1,
+     "blocked_new": 0
+    },
+    {
+     "date": "2024-12-18",
+     "low_new": 1,
+     "blocked_new": 0
+    },
+    {
+     "date": "2024-12-21",
+     "low_new": 1,
+     "blocked_new": 0
+    },
+    {
+     "date": "2024-12-22",
+     "low_new": 1,
+     "blocked_new": 0
+    },
+    {
+     "date": "2024-12-24",
+     "low_new": 1,
+     "blocked_new": 0
+    },
+    {
+     "date": "2024-12-25",
+     "low_new": 1,
+     "blocked_new": 0
+    },
+    {
+     "date": "2024-12-28",
+     "low_new": 1,
+     "blocked_new": 0
+    },
+    {
+     "date": "2025-01-14",
+     "low_new": 1,
+     "blocked_new": 1
+    },
+    {
+     "date": "2025-01-16",
+     "low_new": 1,
+     "blocked_new": 0
+    },
+    {
+     "date": "2025-02-08",
+     "low_new": 1,
+     "blocked_new": 0
+    },
+    {
+     "date": "2025-02-13",
+     "low_new": 1,
+     "blocked_new": 0
+    },
+    {
+     "date": "2025-03-10",
+     "low_new": 1,
+     "blocked_new": 1
+    },
+    {
+     "date": "2025-03-22",
+     "low_new": 1,
+     "blocked_new": 1
+    },
+    {
+     "date": "2025-04-06",
+     "low_new": 1,
+     "blocked_new": 1
+    },
+    {
+     "date": "2025-04-07",
+     "low_new": 1,
+     "blocked_new": 1
+    },
+    {
+     "date": "2025-04-10",
+     "low_new": 1,
+     "blocked_new": 0
+    },
+    {
+     "date": "2025-04-23",
+     "low_new": 2,
+     "blocked_new": 1
+    },
+    {
+     "date": "2025-04-24",
+     "low_new": 1,
+     "blocked_new": 0
+    },
+    {
+     "date": "2025-05-01",
+     "low_new": 1,
+     "blocked_new": 0
+    },
+    {
+     "date": "2025-06-28",
+     "low_new": 1,
+     "blocked_new": 0
+    },
+    {
+     "date": "2025-07-15",
+     "low_new": 1,
+     "blocked_new": 1
+    },
+    {
+     "date": "2025-07-20",
+     "low_new": 1,
+     "blocked_new": 0
+    },
+    {
+     "date": "2025-07-31",
+     "low_new": 1,
+     "blocked_new": 1
+    },
+    {
+     "date": "2025-08-11",
+     "low_new": 1,
+     "blocked_new": 0
+    },
+    {
+     "date": "2025-08-31",
+     "low_new": 1,
+     "blocked_new": 0
+    },
+    {
+     "date": "2025-09-02",
+     "low_new": 1,
+     "blocked_new": 0
+    },
+    {
+     "date": "2025-09-19",
+     "low_new": 1,
+     "blocked_new": 1
+    },
+    {
+     "date": "2025-09-20",
+     "low_new": 1,
+     "blocked_new": 0
+    },
+    {
+     "date": "2025-09-30",
+     "low_new": 1,
+     "blocked_new": 0
+    },
+    {
+     "date": "2025-10-10",
+     "low_new": 1,
+     "blocked_new": 1
+    },
+    {
+     "date": "2025-10-25",
+     "low_new": 1,
+     "blocked_new": 1
+    },
+    {
+     "date": "2025-10-30",
+     "low_new": 1,
+     "blocked_new": 1
+    },
+    {
+     "date": "2025-11-01",
+     "low_new": 2,
+     "blocked_new": 1
+    },
+    {
+     "date": "2025-11-02",
+     "low_new": 1,
+     "blocked_new": 0
+    },
+    {
+     "date": "2025-11-03",
+     "low_new": 3,
+     "blocked_new": 1
+    },
+    {
+     "date": "2025-11-07",
+     "low_new": 1,
+     "blocked_new": 1
+    },
+    {
+     "date": "2025-11-20",
+     "low_new": 1,
+     "blocked_new": 1
+    },
+    {
+     "date": "2025-11-22",
+     "low_new": 1,
+     "blocked_new": 0
+    },
+    {
+     "date": "2025-12-19",
+     "low_new": 1,
+     "blocked_new": 1
+    },
+    {
+     "date": "2025-12-22",
+     "low_new": 1,
+     "blocked_new": 1
+    },
+    {
+     "date": "2026-01-10",
+     "low_new": 1,
+     "blocked_new": 0
+    },
+    {
+     "date": "2026-01-21",
+     "low_new": 1,
+     "blocked_new": 0
+    },
+    {
+     "date": "2026-01-26",
+     "low_new": 1,
+     "blocked_new": 0
+    },
+    {
+     "date": "2026-03-01",
+     "low_new": 1,
+     "blocked_new": 0
+    },
+    {
+     "date": "2026-03-16",
+     "low_new": 1,
+     "blocked_new": 0
+    },
+    {
+     "date": "2026-03-18",
+     "low_new": 1,
+     "blocked_new": 1
+    },
+    {
+     "date": "2026-03-26",
+     "low_new": 1,
+     "blocked_new": 0
+    },
+    {
+     "date": "2026-03-29",
+     "low_new": 1,
+     "blocked_new": 0
+    },
+    {
+     "date": "2026-04-27",
+     "low_new": 1,
+     "blocked_new": 0
+    },
+    {
+     "date": "2026-04-30",
+     "low_new": 1,
+     "blocked_new": 0
+    },
+    {
+     "date": "2026-05-10",
+     "low_new": 1,
+     "blocked_new": 0
+    },
+    {
+     "date": "2026-05-18",
+     "low_new": 1,
+     "blocked_new": 1
+    },
+    {
+     "date": "2026-06-25",
+     "low_new": 1,
+     "blocked_new": 0
+    },
+    {
+     "date": "2026-07-01",
+     "low_new": 1,
+     "blocked_new": 0
+    },
+    {
+     "date": "2026-07-30",
+     "low_new": 1,
+     "blocked_new": 0
+    },
+    {
+     "date": "2026-09-13",
+     "low_new": 1,
+     "blocked_new": 0
+    },
+    {
+     "date": "2026-09-19",
+     "low_new": 1,
+     "blocked_new": 0
+    },
+    {
+     "date": "2026-10-01",
+     "low_new": 1,
+     "blocked_new": 1
+    }
+   ]
+  },
+  "롯데": {
+   "app_id": "com.innov.lottecoupon",
+   "reviews": 86,
+   "low_reviews": 52,
+   "flagged_days": 45,
+   "flagged_by_blocked": 8,
+   "flagged": [
+    {
+     "date": "2024-12-04",
+     "low_new": 1,
+     "blocked_new": 1
+    },
+    {
+     "date": "2024-12-22",
+     "low_new": 1,
+     "blocked_new": 1
+    },
+    {
+     "date": "2024-12-23",
+     "low_new": 2,
+     "blocked_new": 1
+    },
+    {
+     "date": "2024-12-26",
+     "low_new": 1,
+     "blocked_new": 0
+    },
+    {
+     "date": "2024-12-31",
+     "low_new": 1,
+     "blocked_new": 0
+    },
+    {
+     "date": "2025-01-11",
+     "low_new": 1,
+     "blocked_new": 1
+    },
+    {
+     "date": "2025-01-20",
+     "low_new": 1,
+     "blocked_new": 0
+    },
+    {
+     "date": "2025-01-28",
+     "low_new": 1,
+     "blocked_new": 0
+    },
+    {
+     "date": "2025-01-31",
+     "low_new": 1,
+     "blocked_new": 0
+    },
+    {
+     "date": "2025-02-05",
+     "low_new": 1,
+     "blocked_new": 0
+    },
+    {
+     "date": "2025-02-06",
+     "low_new": 1,
+     "blocked_new": 0
+    },
+    {
+     "date": "2025-03-21",
+     "low_new": 1,
+     "blocked_new": 0
+    },
+    {
+     "date": "2025-04-04",
+     "low_new": 1,
+     "blocked_new": 0
+    },
+    {
+     "date": "2025-05-03",
+     "low_new": 1,
+     "blocked_new": 0
+    },
+    {
+     "date": "2025-05-19",
+     "low_new": 1,
+     "blocked_new": 0
+    },
+    {
+     "date": "2025-07-03",
+     "low_new": 1,
+     "blocked_new": 0
+    },
+    {
+     "date": "2025-08-27",
+     "low_new": 1,
+     "blocked_new": 0
+    },
+    {
+     "date": "2025-09-01",
+     "low_new": 1,
+     "blocked_new": 0
+    },
+    {
+     "date": "2025-09-04",
+     "low_new": 1,
+     "blocked_new": 0
+    },
+    {
+     "date": "2025-09-18",
+     "low_new": 1,
+     "blocked_new": 0
+    },
+    {
+     "date": "2025-09-26",
+     "low_new": 2,
+     "blocked_new": 0
+    },
+    {
+     "date": "2025-09-28",
+     "low_new": 1,
+     "blocked_new": 0
+    },
+    {
+     "date": "2025-10-02",
+     "low_new": 1,
+     "blocked_new": 1
+    },
+    {
+     "date": "2025-10-11",
+     "low_new": 1,
+     "blocked_new": 0
+    },
+    {
+     "date": "2025-11-05",
+     "low_new": 1,
+     "blocked_new": 1
+    },
+    {
+     "date": "2025-11-09",
+     "low_new": 1,
+     "blocked_new": 0
+    },
+    {
+     "date": "2025-11-28",
+     "low_new": 1,
+     "blocked_new": 0
+    },
+    {
+     "date": "2025-12-01",
+     "low_new": 1,
+     "blocked_new": 0
+    },
+    {
+     "date": "2025-12-05",
+     "low_new": 1,
+     "blocked_new": 0
+    },
+    {
+     "date": "2025-12-07",
+     "low_new": 1,
+     "blocked_new": 0
+    },
+    {
+     "date": "2026-01-17",
+     "low_new": 1,
+     "blocked_new": 0
+    },
+    {
+     "date": "2026-02-05",
+     "low_new": 1,
+     "blocked_new": 0
+    },
+    {
+     "date": "2026-02-26",
+     "low_new": 1,
+     "blocked_new": 0
+    },
+    {
+     "date": "2026-03-01",
+     "low_new": 1,
+     "blocked_new": 1
+    },
+    {
+     "date": "2026-03-05",
+     "low_new": 1,
+     "blocked_new": 0
+    },
+    {
+     "date": "2026-04-05",
+     "low_new": 2,
+     "blocked_new": 0
+    },
+    {
+     "date": "2026-04-07",
+     "low_new": 1,
+     "blocked_new": 0
+    },
+    {
+     "date": "2026-04-12",
+     "low_new": 1,
+     "blocked_new": 0
+    },
+    {
+     "date": "2026-04-25",
+     "low_new": 1,
+     "blocked_new": 0
+    },
+    {
+     "date": "2026-05-09",
+     "low_new": 1,
+     "blocked_new": 0
+    },
+    {
+     "date": "2026-05-22",
+     "low_new": 1,
+     "blocked_new": 1
+    },
+    {
+     "date": "2026-07-05",
+     "low_new": 1,
+     "blocked_new": 0
+    },
+    {
+     "date": "2026-08-10",
+     "low_new": 1,
+     "blocked_new": 0
+    },
+    {
+     "date": "2026-08-22",
+     "low_new": 1,
+     "blocked_new": 0
+    },
+    {
+     "date": "2026-08-31",
+     "low_new": 1,
+     "blocked_new": 0
+    }
+   ]
+  },
+  "신세계": {
+   "app_id": "com.F1.ShinSG",
+   "reviews": 183,
+   "low_reviews": 128,
+   "flagged_days": 97,
+   "flagged_by_blocked": 14,
+   "flagged": [
+    {
+     "date": "2024-12-05",
+     "low_new": 1,
+     "blocked_new": 0
+    },
+    {
+     "date": "2024-12-09",
+     "low_new": 2,
+     "blocked_new": 0
+    },
+    {
+     "date": "2024-12-11",
+     "low_new": 1,
+     "blocked_new": 0
+    },
+    {
+     "date": "2024-12-16",
+     "low_new": 1,
+     "blocked_new": 1
+    },
+    {
+     "date": "2024-12-18",
+     "low_new": 1,
+     "blocked_new": 0
+    },
+    {
+     "date": "2024-12-22",
+     "low_new": 1,
+     "blocked_new": 0
+    },
+    {
+     "date": "2025-01-03",
+     "low_new": 1,
+     "blocked_new": 0
+    },
+    {
+     "date": "2025-01-04",
+     "low_new": 5,
+     "blocked_new": 1
+    },
+    {
+     "date": "2025-01-08",
+     "low_new": 5,
+     "blocked_new": 0
+    },
+    {
+     "date": "2025-01-18",
+     "low_new": 1,
+     "blocked_new": 0
+    },
+    {
+     "date": "2025-01-26",
+     "low_new": 1,
+     "blocked_new": 0
+    },
+    {
+     "date": "2025-02-09",
+     "low_new": 1,
+     "blocked_new": 0
+    },
+    {
+     "date": "2025-02-27",
+     "low_new": 1,
+     "blocked_new": 0
+    },
+    {
+     "date": "2025-03-25",
+     "low_new": 1,
+     "blocked_new": 0
+    },
+    {
+     "date": "2025-03-27",
+     "low_new": 1,
+     "blocked_new": 0
+    },
+    {
+     "date": "2025-04-05",
+     "low_new": 1,
+     "blocked_new": 0
+    },
+    {
+     "date": "2025-04-09",
+     "low_new": 1,
+     "blocked_new": 0
+    },
+    {
+     "date": "2025-05-10",
+     "low_new": 1,
+     "blocked_new": 0
+    },
+    {
+     "date": "2025-05-30",
+     "low_new": 1,
+     "blocked_new": 0
+    },
+    {
+     "date": "2025-05-31",
+     "low_new": 1,
+     "blocked_new": 0
+    },
+    {
+     "date": "2025-06-11",
+     "low_new": 1,
+     "blocked_new": 0
+    },
+    {
+     "date": "2025-06-19",
+     "low_new": 1,
+     "blocked_new": 0
+    },
+    {
+     "date": "2025-07-06",
+     "low_new": 1,
+     "blocked_new": 1
+    },
+    {
+     "date": "2025-07-07",
+     "low_new": 1,
+     "blocked_new": 0
+    },
+    {
+     "date": "2025-07-23",
+     "low_new": 1,
+     "blocked_new": 0
+    },
+    {
+     "date": "2025-08-03",
+     "low_new": 1,
+     "blocked_new": 1
+    },
+    {
+     "date": "2025-08-07",
+     "low_new": 1,
+     "blocked_new": 0
+    },
+    {
+     "date": "2025-08-09",
+     "low_new": 2,
+     "blocked_new": 0
+    },
+    {
+     "date": "2025-08-10",
+     "low_new": 1,
+     "blocked_new": 0
+    },
+    {
+     "date": "2025-08-15",
+     "low_new": 1,
+     "blocked_new": 0
+    },
+    {
+     "date": "2025-08-22",
+     "low_new": 1,
+     "blocked_new": 0
+    },
+    {
+     "date": "2025-09-03",
+     "low_new": 1,
+     "blocked_new": 0
+    },
+    {
+     "date": "2025-09-15",
+     "low_new": 1,
+     "blocked_new": 1
+    },
+    {
+     "date": "2025-09-20",
+     "low_new": 1,
+     "blocked_new": 0
+    },
+    {
+     "date": "2025-09-24",
+     "low_new": 1,
+     "blocked_new": 0
+    },
+    {
+     "date": "2025-09-26",
+     "low_new": 1,
+     "blocked_new": 0
+    },
+    {
+     "date": "2025-10-06",
+     "low_new": 1,
+     "blocked_new": 0
+    },
+    {
+     "date": "2025-10-08",
+     "low_new": 1,
+     "blocked_new": 0
+    },
+    {
+     "date": "2025-10-13",
+     "low_new": 1,
+     "blocked_new": 0
+    },
+    {
+     "date": "2025-10-14",
+     "low_new": 1,
+     "blocked_new": 1
+    },
+    {
+     "date": "2025-10-19",
+     "low_new": 1,
+     "blocked_new": 0
+    },
+    {
+     "date": "2025-10-22",
+     "low_new": 2,
+     "blocked_new": 0
+    },
+    {
+     "date": "2025-10-27",
+     "low_new": 1,
+     "blocked_new": 0
+    },
+    {
+     "date": "2025-11-04",
+     "low_new": 2,
+     "blocked_new": 0
+    },
+    {
+     "date": "2025-11-05",
+     "low_new": 3,
+     "blocked_new": 0
+    },
+    {
+     "date": "2025-11-07",
+     "low_new": 1,
+     "blocked_new": 0
+    },
+    {
+     "date": "2025-11-16",
+     "low_new": 1,
+     "blocked_new": 0
+    },
+    {
+     "date": "2025-11-18",
+     "low_new": 1,
+     "blocked_new": 0
+    },
+    {
+     "date": "2025-11-22",
+     "low_new": 1,
+     "blocked_new": 0
+    },
+    {
+     "date": "2025-11-28",
+     "low_new": 1,
+     "blocked_new": 0
+    },
+    {
+     "date": "2025-11-30",
+     "low_new": 1,
+     "blocked_new": 1
+    },
+    {
+     "date": "2025-12-07",
+     "low_new": 1,
+     "blocked_new": 0
+    },
+    {
+     "date": "2025-12-17",
+     "low_new": 1,
+     "blocked_new": 0
+    },
+    {
+     "date": "2025-12-20",
+     "low_new": 1,
+     "blocked_new": 0
+    },
+    {
+     "date": "2025-12-22",
+     "low_new": 2,
+     "blocked_new": 0
+    },
+    {
+     "date": "2025-12-28",
+     "low_new": 1,
+     "blocked_new": 0
+    },
+    {
+     "date": "2025-12-31",
+     "low_new": 1,
+     "blocked_new": 0
+    },
+    {
+     "date": "2026-01-04",
+     "low_new": 1,
+     "blocked_new": 1
+    },
+    {
+     "date": "2026-01-06",
+     "low_new": 1,
+     "blocked_new": 0
+    },
+    {
+     "date": "2026-01-09",
+     "low_new": 1,
+     "blocked_new": 0
+    },
+    {
+     "date": "2026-01-10",
+     "low_new": 1,
+     "blocked_new": 0
+    },
+    {
+     "date": "2026-01-13",
+     "low_new": 1,
+     "blocked_new": 0
+    },
+    {
+     "date": "2026-01-15",
+     "low_new": 1,
+     "blocked_new": 0
+    },
+    {
+     "date": "2026-02-04",
+     "low_new": 1,
+     "blocked_new": 0
+    },
+    {
+     "date": "2026-02-06",
+     "low_new": 1,
+     "blocked_new": 0
+    },
+    {
+     "date": "2026-02-15",
+     "low_new": 1,
+     "blocked_new": 0
+    },
+    {
+     "date": "2026-03-07",
+     "low_new": 1,
+     "blocked_new": 0
+    },
+    {
+     "date": "2026-03-20",
+     "low_new": 1,
+     "blocked_new": 0
+    },
+    {
+     "date": "2026-03-24",
+     "low_new": 1,
+     "blocked_new": 0
+    },
+    {
+     "date": "2026-04-13",
+     "low_new": 1,
+     "blocked_new": 0
+    },
+    {
+     "date": "2026-04-14",
+     "low_new": 1,
+     "blocked_new": 0
+    },
+    {
+     "date": "2026-04-16",
+     "low_new": 1,
+     "blocked_new": 1
+    },
+    {
+     "date": "2026-04-18",
+     "low_new": 1,
+     "blocked_new": 1
+    },
+    {
+     "date": "2026-05-08",
+     "low_new": 1,
+     "blocked_new": 0
+    },
+    {
+     "date": "2026-05-12",
+     "low_new": 1,
+     "blocked_new": 1
+    },
+    {
+     "date": "2026-05-13",
+     "low_new": 1,
+     "blocked_new": 0
+    },
+    {
+     "date": "2026-05-21",
+     "low_new": 1,
+     "blocked_new": 0
+    },
+    {
+     "date": "2026-05-25",
+     "low_new": 1,
+     "blocked_new": 0
+    },
+    {
+     "date": "2026-05-29",
+     "low_new": 1,
+     "blocked_new": 0
+    },
+    {
+     "date": "2026-05-30",
+     "low_new": 1,
+     "blocked_new": 0
+    },
+    {
+     "date": "2026-06-08",
+     "low_new": 5,
+     "blocked_new": 1
+    },
+    {
+     "date": "2026-06-14",
+     "low_new": 1,
+     "blocked_new": 0
+    },
+    {
+     "date": "2026-06-17",
+     "low_new": 1,
+     "blocked_new": 0
+    },
+    {
+     "date": "2026-06-19",
+     "low_new": 1,
+     "blocked_new": 0
+    },
+    {
+     "date": "2026-07-03",
+     "low_new": 1,
+     "blocked_new": 0
+    },
+    {
+     "date": "2026-07-07",
+     "low_new": 1,
+     "blocked_new": 1
+    },
+    {
+     "date": "2026-07-25",
+     "low_new": 2,
+     "blocked_new": 0
+    },
+    {
+     "date": "2026-07-26",
+     "low_new": 1,
+     "blocked_new": 0
+    },
+    {
+     "date": "2026-08-04",
+     "low_new": 3,
+     "blocked_new": 0
+    },
+    {
+     "date": "2026-08-13",
+     "low_new": 1,
+     "blocked_new": 0
+    },
+    {
+     "date": "2026-09-06",
+     "low_new": 1,
+     "blocked_new": 0
+    },
+    {
+     "date": "2026-09-07",
+     "low_new": 1,
+     "blocked_new": 0
+    },
+    {
+     "date": "2026-09-20",
+     "low_new": 1,
+     "blocked_new": 0
+    },
+    {
+     "date": "2026-09-23",
+     "low_new": 1,
+     "blocked_new": 0
+    },
+    {
+     "date": "2026-09-28",
+     "low_new": 1,
+     "blocked_new": 1
+    },
+    {
+     "date": "2026-10-13",
+     "low_new": 1,
+     "blocked_new": 0
+    },
+    {
+     "date": "2026-11-02",
+     "low_new": 1,
+     "blocked_new": 0
+    }
+   ]
+  }
+ },
+ "made_at": "2026-11-04T14:33+09:00"
+}
