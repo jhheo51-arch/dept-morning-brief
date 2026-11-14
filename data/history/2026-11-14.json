@@ -1,0 +1,16 @@
+{
+ "date": "2026-11-14",
+ "status": "평소",
+ "low_new": 0,
+ "blocked_new": 0,
+ "low_7d": 0,
+ "pilot": "넓힌다(현재 신호)",
+ "failures": [
+  "날씨 예보 수집"
+ ],
+ "sales_status": "구분 확인",
+ "sales_yoy": -0.4,
+ "promo_warn": 3,
+ "touch_flags": 3,
+ "tasks_overdue": 1
+}
